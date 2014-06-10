@@ -1,0 +1,3431 @@
+\documentclass[a4paper,11pt,CJK]{article}
+\usepackage[top=1in, bottom=1in, left=1.25in, right=1.25in]{geometry}
+\usepackage{CJK}
+\usepackage{colortbl}
+%\usepackage{hyperref}
+\usepackage[dvipdfm,bookmarks=true,CJKbookmarks=true]{hyperref}
+\usepackage{booktabs}
+\usepackage{indentfirst}
+\usepackage{fancyhdr}
+\begin{document}
+\begin{CJK}{UTF8}{gbsn} %gbsn, stheiti
+\setlength{\parindent}{2em}
+\pagestyle{fancy}
+\title{C++风格指南}
+\author{并行编程模型小组}
+\date{2011~年~4~月~20~日}
+\maketitle
+\noindent
+\hspace{2ex} \Large{相比个人喜好，一致性更重要，不管你怎么想，规则总是规则！}
+\newpage
+\tableofcontents
+\newpage
+\section{头文件}
+\subsection{ \#define保护}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+所有头文件都应该使用 \#define 防止头文件被多重包含, 命名格式当是: $<$PROJECT$>$\_$<$PATH$>$\_$<$FILE$>$\_H\_ \\
+\bottomrule
+\end{tabular}
+\end{table}
+为保证唯一性, 头文件的命名应该依据所在项目源代码树的全路径. 例如, 项目 foo 中的头文件 foo/src/bar/baz.h 可按如下方式保护: \\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent \#ifndef FOO\_BAR\_BAZ\_H\_ \\
+\indent \#define FOO\_BAR\_BAZ\_H\_ \\
+\indent \dots  \\
+\indent \#endif /// FOO\_BAR\_BAZ\_H\_
+\end{minipage}
+}
+
+
+\subsection{头文件依赖}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+能用前置声明的地方尽量不使用 \#include. \\
+\bottomrule
+\end{tabular}
+\end{table}
+当一个头文件被包含的同时也引入了新的依赖, 一旦该头文件被修改, 代码就会被重新编译. 如果这个头文件又包含了其他头文件, 这些头文件的任何改变都将导致所有包含了该头文件的代码被重新编译. 因此, 我们倾向于减少包含头文件, 尤其是在头文件中包含头文件. \\
+\indent 使用前置声明可以显著减少需要包含的头文件数量. 举例说明: 如果头文件中用到类 File, 但不需要访问 File 类的声明, 头文件中只需前置声明 class File; 而无须 \#include ``file/base/file.h''. \\
+\indent 不允许访问类的定义的前提下, 我们在一个头文件中能对类 Foo 做哪些操作?
+\begin{itemize}
+    \item 我们可以将数据成员类型声明为 Foo $*$ 或 Foo \&.
+    \item 我们可以将函数参数 / 返回值的类型声明为 Foo (但不能定义实现).
+    \item 我们可以将静态数据成员的类型声明为 Foo, 因为静态数据成员的定义在类定义之外.
+\end{itemize}
+反之, 如果你的类是 Foo 的子类, 或者含有类型为 Foo 的非静态数据成员, 则必须包含 Foo 所在的头文件. \\
+\indent 有时, 使用指针成员 (如果是 scoped\_ptr 更好) 替代对象成员的确是明智之选. 然而, 这会降低代码可读性及执行效率, 因此如果仅仅为了少包含头文件，还是不要这么做的好. \\
+\indent 当然 .cpp 文件无论如何都需要所使用类的定义部分, 自然也就会包含若干头文件.
+
+\subsection{内联函数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+只有当函数只有 10 行甚至更少时才将其定义为内联函数. \\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}: \\
+\indent 当函数被声明为内联函数之后, 编译器会将其内联展开, 而不是按通常的函数调用机制进行调用. \\
+\\
+\textbf{优点}: \\
+\indent 当函数体比较小的时候, 内联该函数可以令目标代码更加高效. 对于存取函数以及其它函数体比较短, 性能关键的函数, 鼓励使用内联. \\
+\\
+\textbf{缺点}: \\
+\indent 滥用内联将导致程序变慢. 内联可能使目标代码量或增或减, 这取决于内联函数的大小. 内联非常短小的存取函数通常会减少代码大小, 但内联一个相当大的函数将戏剧性的增加代码大小. 现代处理器由于更好的利用了指令缓存, 小巧的代码往往执行更快.\\
+\\
+\textbf{结论}: \\
+\indent 一个较为合理的经验准则是, 不要内联超过 10 行的函数. 谨慎对待析构函数, \textbf{析构函数往往比其表面看起来要更长}, 因为有隐含的成员和基类析构函数被调用! \\
+\indent 另一个实用的经验准则: 内联那些包含循环或 switch 语句的函数常常是得不偿失 (除非在大多数情况下, 这些循环或 switch 语句从不被执行). \\
+\indent 有些函数即使声明为内联的也不一定会被编译器内联, 这点很重要; 比如虚函数和递归函数就不会被正常内联. 通常, 递归函数不应该声明成内联函数. （递归调用堆栈的展开并不像循环那么简单, 比如递归层数在编译时可能是未知的, 大多数编译器都不支持内联递归函数). 虚函数内联的主要原因则是想把它的函数体放在类定义内, 为了图个方便, 抑或是当作文档描述其行为, 比如精短的存取函数.
+
+\subsection{\_inl.h文件}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+复杂的内联函数的定义以及函数模版的定义, 应放在后缀名为 \_inl.h 的头文件中. \\
+\bottomrule
+\end{tabular}
+\end{table}
+内联函数的定义必须放在头文件中, 编译器才能在调用点内联展开定义. 然而, 实现代码理论上应该放在 .cpp 文件中, 我们不希望 .h 文件中有太多实现代码, 除非在可读性和性能上有明显优势. \\
+\indent 如果内联函数的定义比较短小(只有一行的内联函数直接放在.h中，否则放在\_inl.h), 逻辑比较简单, 实现代码放在 .h 文件里没有任何问题. 比如, 存取函数的实现理所当然都应该放在类定义内. 出于编写者和调用者的方便, 较复杂的内联函数也可以放到 .h 文件中, 如果你觉得这样会使头文件显得笨重, 也可以把它萃取到单独的 \_inl.h 中. 这样把实现和类定义分离开来, 当需要时包含对应的 \_inl.h 即可。\\
+\indent \_inl.h 文件还可用于函数模板的定义. 从而增强模板定义的可读性. \\
+\indent 别忘了 \_inl.h 和其他头文件一样, 也需要 \#define 保护. \\
+\indent 注意：include中包含inl的目录，其中放置*\_inl.h的文件.
+\\
+\\
+\subsection{函数参数的顺序}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+定义函数时, 参数顺序依次为: 输入参数, 然后是输出参数. \\
+\bottomrule
+\end{tabular}
+\end{table}
+C/C++ 函数参数分为输入参数, 输出参数, 和输入/输出参数三种. 输入参数一般传值或传 const 引用, 输出参数或输入/输出参数则是非const 指针. 对参数排序时,
+将只输入的参数放在所有输出参数之前. 尤其是不要仅仅因为是新加的参数, 就把它放在最后; 即使是新加的只输入参数也要放在输出参数之前. \\
+\indent 这条规则并不需要严格遵守. 输入/输出两用参数 (通常是类/结构体变量) 把事情变得复杂, 为保持和相关函数的一致性, 你有时不得不有所变通. \\
+
+\subsection{ \#include的路径及顺序}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+使用标准的头文件包含顺序可增强可读性, 避免隐藏依赖: C 库, C++ 库, 其他库的 .h, 本项目内的 .h. \\
+\bottomrule
+\end{tabular}
+\end{table}
+项目内头文件应按照项目源代码目录树结构排列, 避免使用 UNIX 特殊的快捷目录 . (当前目录) 或 .. (上级目录). 例如, google-awesome-project/src/base/logging.h 应该按如下方式包含: \\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\#include ``base/logging.h''
+\end{minipage}
+}
+\\
+\\
+\indent 又如, dir/foo.cpp 的主要作用是实现或测试 dir2/foo2.h 的功能, foo.cpp 中包含头文件的次序如下:
+\begin{enumerate}
+    \item dir2/foo2.h (优先位置, 详情如下)
+    \item C 系统文件
+    \item C++ 系统文件
+    \item 其他库的 .h 文件
+    \item 本项目内 .h 文件
+\end{enumerate}
+
+\indent 这种排序方式可有效减少隐藏依赖. 我们希望每一个头文件都是可被独立编译的 (即该头文件本身已包含所有必要的显式依赖), 最简单的方法是将其作为第一个 .h 文件 \#included 进对应的 .cpp. \\
+\indent dir/foo.cpp 和 dir2/foo2.h 通常位于同一目录下 (如 base/basic-types\_unittest.cpp 和 base/basictypes.h), 但也可以放在不同目录下. \\
+\indent 按字母顺序对头文件包含进行二次排序是不错的主意 (之前已经按头文件类别排过序了). \\
+\indent 举例来说, google-awesome-project/src/foo/internal/fooserver.cpp 的包含次序如下: \\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent \#include ``foo/public/fooserver.h'' /// 优先位置\\
+\indent \#include $<$sys/types.h$>$\\
+\indent \#include $<$unistd.h$>$ \\
+\indent \#include $<$hash\_map$>$\\
+\indent \#include $<$vector$>$\\
+\indent \#include ``base/basictypes.h''\\
+\indent \#include ``base/commandlineflags.h''\\
+\indent \#include ``foo/public/bar.h''
+\end{minipage}
+}
+\\
+\subsection{笔记}
+\begin{enumerate}
+    \item 避免多重包含是学编程时最基本的要求;
+    \item 前置声明是为了降低编译依赖，防止修改一个头文件引发多米诺效应;
+    \item 内联函数的合理使用可提高代码执行效率;
+    \item \_inl.h 可提高代码可读性(一般用不到吧);
+    \item 标准化函数参数顺序可以提高可读性和易维护性 (对函数参数的堆栈空间有轻微影响);
+    \item 包含文件的名称使用 . 和 .. 虽然方便却易混乱, 使用比较完整的项目路径看上去很清晰, 很条理, 包含文件的次序除了美观之外, 最重要的是可以减少隐藏依赖, 使每个头文件在 ``最需要编译'' (对应源文件处) 的地方编译, 有人提出库文件放在最后, 这样出错先是项目内的文件, 头文件都放在对应源文件的最前面, 这一点足以保证内部错误的及时发现了.
+\end{enumerate}
+\newpage
+\section{作用域}
+\subsection{名字空间}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+鼓励在 .cpp 文件内使用匿名名字空间. 使用具名的名字空间时, 其名称可基于项目名或相对路径. 可以使用 \emph{using} 关键字，但不要使用\emph{using namespace} 命名空间.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}: \\
+\indent 名字空间将全局作用域细分为独立的, 具名的作用域, 可有效防止全局作用域的命名冲突. \\
+\\
+\textbf{优点}: \\
+\indent 虽然类已经提供了（可嵌套的）命名轴线 (将命名分割在不同类的作用域内), 名字空间在这基础上又封装了一层. \\
+\indent 举例来说, 两个不同项目的全局作用域都有一个类 Foo, 这样在编译或运行时造成冲突. 如果每个项目将代码置于不同名字空间中, project1::Foo 和 project2::Foo 作为不同符号自然不会冲突. \\
+\\
+\textbf{缺点}: \\
+\indent 名字空间具有迷惑性, 因为它们和类一样提供了额外的 (可嵌套的) 命名轴线. \\
+\indent 在头文件中使用匿名空间导致违背 C++ 的唯一定义原则 (One Definition Rule (ODR)). \\
+\\
+\textbf{结论}: \\
+\indent 根据下文将要提到的策略合理使用命名空间. \\
+\subsubsection{匿名名字空间}
+在 .cpp 文件中, 允许甚至鼓励使用匿名名字空间, 以避免运行时的命名冲突: \\
+\\
+\noindent
+\fbox{
+\begin{minipage}{400pt}
+namespace \{     \qquad \qquad \qquad \qquad \qquad \qquad      /// .cpp 文件中 \\
+\\
+/// 名字空间的内容无需缩进\\
+enum \{ kUNUSED, kEOF, kERROR \};         /// 经常使用的符号 \\
+bool AtEof() \{ return pos\_ $==$ kEOF; \}///使用本名字空间内的符号EOF \\
+\\
+\} /// namespace
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 然而, 与特定类关联的文件作用域声明在该类中被声明为类型, 静态数据成员或静态成员函数, 而不是匿名名字空间的成员. 如上例所示, 匿名空间结束时用注释 /// namespace 标识. \\
+\indent 不要在 .h 文件中使用匿名名字空间. \\
+
+\subsubsection{具名的名字空间}
+具名的名字空间使用方式如下: \\
+\indent 用名字空间把文件包含, gflags 的声明/定义, 以及类的前置声明以外的整个源文件封装起来, 以区别于其它名字空间: \\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent/// .h 文件 \\
+\indent namespace mynamespace \{ \\
+\\
+\indent /// 所有声明都置于命名空间中\\
+\indent /// 注意不要使用缩进\\
+\indent class MyClass \{ \par
+\hspace{3ex}  public: \par
+\hspace{3ex}  \dots \par
+\hspace{3ex}  void Foo();\\
+\indent \};\\
+\\
+\indent \} /// namespace mynamespace
+\end{minipage}
+}
+\\
+\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// .cpp 文件\\
+\indent namespace mynamespace \{\\
+\\
+\indent /// 函数定义都置于命名空间中\\
+\indent void MyClass::Foo() \{\par
+\hspace{3ex}    \dots\\
+\indent \}\\
+\\
+\indent \} /// namespace mynamespace
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 通常的 .cpp 文件包含更多, 更复杂的细节, 比如引用其他名字空间的类等.\\
+\\
+\noindent
+\fbox{
+\begin{minipage}{400pt}
+\indent \#include ``a.h''\\
+\\
+\indent DEFINE\_bool(someflag, false, ``dummy flag'');\\
+\\
+\indent class C;                    /// 全局名字空间中类 C 的前置声明\\
+\indent namespace a \{ class A; \}    /// a::A 的前置声明\\
+\indent \\
+\indent namespace b \{\\
+\indent \\
+\indent \dots code for b\dots                /// b 中的代码\\
+\\
+\indent \} /// namespace b
+\end{minipage}
+}
+\\
+\begin{enumerate}
+    \item 不要在名字空间 std 内声明任何东西, 包括标准库的类前置声明. 在 std 名字空间声明实体会导致不确定的问题, 比如不可移植. 声明标准库下的实体, 需要包含对应的头文件.
+    \item 最好不要使用 ``using''关键字, 以保证名字空间下的所有名称都可以正常使用.\\
+        \\
+    \noindent
+    \fbox{
+    \begin{minipage}{370pt}
+    /// 禁止 —— 污染名字空间\\
+    using namespace foo;
+    \end{minipage}
+    }
+    \item 在 .cpp 文件, .h 文件的函数, 方法或类中, 可以使用 ``using`` 关键字.\\
+        \\
+    \noindent
+    \fbox{
+    \begin{minipage}{370pt}
+    /// 允许: .cpp 文件中\\
+    /// .h 文件的话, 必须在函数, 方法或类的内部使用\\
+    using ::foo::bar;
+    \end{minipage}
+    }
+    \item 在 .cpp 文件, .h 文件的具名的名字空间里, 方法或类中, 允许使用名字空间别名.\\
+    \\
+    \noindent
+    \fbox{
+    \begin{minipage}{370pt}
+    \indent /// 在 .cpp 文件中，使用名字空间别名.\\
+    \indent namespace fbz = ::foo::bar::baz;\\
+
+    \indent /// 在.h文件中，使用名字空间别名.\\
+    namespace librarian \{\\
+    /// 下面的别名对于所有包含这个头文件的所有\\
+    /// 文件有效 (in namespace librarian):\\
+    /// 这个别名应该一直在这个系统中保持不变.\\
+    namespace pd\_s = ::pipeline\_diagnostics::sidetable;\\
+
+    inline void my\_inline\_function() \{\\
+    /// 对于一个类(或者方法)本地化的命名空间别名.\\
+    namespace fbz = ::foo::bar::baz;\par
+    \hspace{3ex}  ...\\
+    \}\\
+\}  /// namespace librarian
+\end{minipage}
+}
+
+\end{enumerate}
+\subsection{嵌套类}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+当公有嵌套类作为接口的一部分时, 虽然可以直接将他们保持在全局作用域中, 但将嵌套类的声明置于名字空间内是更好的选择. \\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}: \\在一个类内部定义另一个类; 嵌套类也被称为 成员类 (member class).\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent class Foo \{\\
+\\
+\indent \indent private: \par
+\hspace{3ex}     /// Bar是嵌套在Foo中的成员类   \par
+\hspace{3ex}     class Bar \{    \par
+\hspace{6ex}         \dots   \par
+\hspace{3ex}     \};\\
+\\
+\indent \};
+\end{minipage}
+}
+\\
+\\
+\\
+\textbf{优点}:\\
+\indent 当嵌套 (或成员) 类只被外围类使用时非常有用; 把它作为外围类作用域内的成员, 而不是去污染外部作用域的同名类. 嵌套类可以在外围类中做前置声明, 然后在 .cpp 文件中定义, 这样避免在外围类的声明中定义嵌套类, 因为嵌套类的定义通常只与实现相关.\\
+\\
+\textbf{缺点}:\\
+\indent 嵌套类只能在外围类的内部做前置声明. 因此, 任何使用了 Foo::Bar* 指针的头文件不得不包含类 Foo 的整个声明.\\
+\\
+\textbf{结论}:\\
+\indent 不要将嵌套类定义成公有, 除非它们是接口的一部分, 比如, 嵌套类含有某些方法的一组选项.\\
+
+\subsection{非成员函数, 静态成员函数, 和全局函数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+使用静态成员函数或名字空间内的非成员函数, 尽量不要用裸的全局函数.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{优点}:\\
+\indent 某些情况下, 非成员函数和静态成员函数是非常有用的, 将非成员函数放在名字空间内可避免污染全局作用域.\\
+\\
+\textbf{缺点}:\\
+\indent 将非成员函数和静态成员函数作为新类的成员或许更有意义, 当它们需要访问外部资源或具有重要的依赖关系时更是如此.\\
+\\
+\textbf{结论}:\\
+\indent 有时, 把函数的定义同类的实例脱钩是有益的, 甚至是必要的. 这样的函数可以被定义成静态成员, 或是非成员函数. 非成员函数不应依赖于外部变量, 应尽量置于某个名字空间内. 相比单纯为了封装若干不共享任何静态数据的静态成员函数而创建类, 不如使用命名空间.\\
+
+\indent 定义在同一编译单元的函数, 被其他编译单元直接调用可能会引入不必要的耦合和链接时依赖; 静态成员函数对此尤其敏感. 可以考虑提取到新类中, 或者将函数置于独立库的名字空间内.\\
+
+\indent 如果你必须定义非成员函数, 又只是在 .cpp 文件中使用它, 可使用匿名名字空间或 static 链接关键字 (如 static int Foo() {\dots}) 限定其作用域.\\
+
+\subsection{局部变量}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+将函数变量尽可能置于最小作用域内, 并在变量声明时进行初始化.\\
+\bottomrule
+\end{tabular}
+\end{table}
+C++ 允许在函数的任何位置声明变量. 我们提倡在尽可能小的作用域中声明变量, 离第一次使用越近越好. 这使得代码浏览者更容易定位变量声明的位置, 了解变量的类型和初始值. 特别是，\textbf{应使用初始化的方式替代声明再赋值}, 比如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+int i;\\
+i $=$ f(); /// 坏--初始化和声明分离\\
+int j $=$ g(); /// 好--初始化时声明
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 注意, GCC 可正确实现了 for (int i $=$ 0; i $<$ 10; ++i) (i 的作用域仅限 for 循环内), 所以其他 for 循环中可以重新使用 i. 在 if 和 while 等语句中的作用域声明也是正确的, 如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+while (const char* p $=$ strchr(str, `/')) str $=$ p + 1;
+\end{minipage}
+}
+\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+如果变量是一个对象, 每次进入作用域都要调用其构造函数, 每次退出作用域都要调用其析构函数.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// 低效的实现\\
+\indent for (int i = 0; i $<$ 1000000; ++i) \{\par
+\hspace{3ex} \indent Foo f;                  /// 构造函数和析构函数分别调用 1000000 次!\par
+\hspace{3ex} \indent f.doSomething(i);\\
+\indent \}\\
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 在循环作用域外面声明这类变量要高效的多:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent Foo f;                      /// 构造函数和析构函数只调用 1 次\\
+\indent for (int i = 0; i $<$ 1000000; ++i) \{\par
+\hspace{3ex} \indent     f.DoSomething(i);\\
+\indent \}
+\end{minipage}
+}
+
+\subsection{静态和全局变量}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+禁止使用 class 类型的静态或全局变量: 它们会导致很难发现的 bug 和不确定的构造和析构函数调用顺序.\\
+\bottomrule
+\end{tabular}
+\end{table}
+静态生存周期的对象, 包括全局变量, 静态变量, 静态类成员变量, 以及函数静态变量, 都必须是原生数据类型 (\textbf{POD : Plain Old Data}): 只能是 int, char, float, 和 void, 以及 POD 类型的数组/结构体/指针. 永远不要使用函数返回值初始化静态变量; 不要在多线程代码中使用非 const 的静态变量.\\
+
+\indent 不幸的是, 静态变量的构造函数, 析构函数以及初始化操作的调用顺序在 C++ 标准中未明确定义, 甚至每次编译构建都有可能会发生变化, 从而导致难以发现的 bug. 比如, 结束程序时, 某个静态变量已经被析构了, 但代码还在跑，其它线程很可能试图访问该变量, 直接导致崩溃.\\
+
+\indent 所以, 我们只允许 POD 类型的静态变量. 本条规则完全禁止 vector (使用 C 数组替代), string (使用 const char*), 及其它以任意方式包含或指向类实例的东东, 成为静态变量. 出于同样的理由, 我们不允许用函数返回值来初始化静态变量.\\
+
+\indent 如果你确实需要一个 class类型的静态或全局变量, 可以考虑在 main() 函数或 pthread\_once() 内初始化一个你永远不会回收的指针.(静态变量泛指静态生存周期的对象, 包括: 全局变量, 静态变量, 静态类成员变量, 以及函数静态变量.)
+
+\subsection{笔记}
+\begin{enumerate}
+    \item .cpp 中的匿名名字空间可避免命名冲突, 限定作用域, 避免直接使用 using 关键字污染命名空间;
+
+    \item 嵌套类符合局部使用原则, 只是不能在其他头文件中前置声明, 尽量不要 public;
+
+    \item 尽量不用全局函数和全局变量, 考虑作用域和命名空间限制, 尽量单独形成编译单元;
+
+    \item 多线程中的全局变量 (含静态成员变量) 不要使用 class 类型 (含 STL 容器), 避免不明确行为导致的 bug.
+
+    \item 作用域的使用, 除了考虑名称污染, 可读性之外, 主要是为降低耦合, 提高编译/执行效率.
+
+\end{enumerate}
+\newpage
+
+\section{类}
+类是 C++ 中代码的基本单元. 显然, 它们被广泛使用. 本节列举了在写一个类时的主要注意事项.\\
+\subsection{构造函数的职责}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+构造函数中只进行那些没什么意义的 (简单初始化对于程序执行没有实际的逻辑意义, 因为成员变量``有意义'' 的值大多不在构造函数中确定) 初始化, 可能的话, 使用 Init() 方法集中初始化有意义的 (non-trivial) 数据.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 在构造函数体中进行初始化操作.\\
+\\
+\textbf{优点}:\\
+\indent 排版方便, 无需担心类是否已经初始化.\\
+\\
+\textbf{缺点}:\\
+\indent 在构造函数中执行操作引起的问题有:
+\begin{enumerate}
+    \item 构造函数中很难上报错误, 不能使用异常.
+    \item 操作失败会造成对象初始化失败，进入不确定状态.
+    \item 如果在构造函数内调用了自身的虚函数, 这类调用是不会重定向到子类的虚函数实现. 即使当前没有子类化实现, 将来仍是隐患.
+    \item 如果有人创建该类型的全局变量 (虽然违背了上节提到的规则), 构造函数将先 main() 一步被调用, 有可能破坏构造函数中暗含的假设条件. 例如, gflags 尚未初始化.
+\end{enumerate}
+\noindent
+\textbf{结论}:\\
+\indent 如果对象需要进行有意义的 (non-trivial) 初始化, 考虑使用明确的 Init() 方法并 (或) 增加一个成员标记用于指示对象是否已经初始化成功.\\
+
+\subsection{默认构造函数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+如果一个类定义了若干成员变量又没有其它构造函数, 必须定义一个默认构造函数. 否则编译器将自动生产一个很糟糕的默认构造函数.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent new 一个不带参数的类对象时, 会调用这个类的默认构造函数. 用 new[ ] 创建数组时，默认构造函数则总是被调用.\\
+\\
+\textbf{优点}:\\
+\indent 默认将结构体初始化为 “无效” 值, 使调试更方便.\\
+\\
+\textbf{缺点}:\\
+\indent 对代码编写者来说, 这是多余的工作.\\
+\\
+\textbf{结论}:\\
+\indent 如果类中定义了成员变量, 而且没有提供其它构造函数, 你必须定义一个 (不带参数的) 默认构造函数. \\
+\indent 把对象的内部状态初始化成一致/有效的值无疑是更合理的方式.\\
+\indent 这么做的原因是: 如果你没有提供其它构造函数, 又没有定义默认构造函数, 编译器将为你自动生成一个. 编译器生成的构造函数并不会对对象进行合理的初始化.\\
+\indent 如果你定义的类继承现有类, 而你又没有增加新的成员变量, 则不需要为新类定义默认构造函数.\\
+
+\subsection{显式构造函数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+对单个参数的构造函数使用 C++ 关键字 explicit.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 通常, 如果构造函数只有一个参数, 可看成是一种隐式转换. 打个比方, 如果你定义了 Foo::Foo(string name), 接着把一个字符串传给一个以 Foo 对象为参数的函数, 构造函数 Foo::Foo(string name) 将被调用, 并将该字符串转换为一个 Foo 的临时对象传给调用函数. 看上去很方便, 但如果你并不希望如此通过转换生成一个新对象的话, 麻烦也随之而来. 为避免构造函数被调用造成隐式转换, 可以将其声明为 explicit.\\
+\\
+\textbf{优点}:\\
+\indent 避免不合时宜的变换.\\
+\\
+\textbf{缺点}:\\
+\indent 无\\
+\\
+\textbf{结论}:\\
+\indent 所有单参数构造函数都必须是显式的. 在类定义中, 将关键字 explicit 加到单参数构造函数前: explicit Foo(string name);\\
+\indent 例外: 在极少数情况下, 拷贝构造函数可以不声明成 explicit. 作为其它类的透明包装器的类也是特例之一. 类似的例外情况应在注释中明确说明.
+
+\subsection{拷贝构造函数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+仅在代码中需要拷贝一个类对象的时候使用拷贝构造函数; 大部分情况下都不需要, 此时应使用 DISALLOW\_COPY\_AND\_ASSIGN.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 拷贝构造函数在复制一个对象到新建对象时被调用 (特别是对象传值时).\\
+\\
+\textbf{优点}:\\
+\indent 拷贝构造函数使得拷贝对象更加容易. STL 容器要求所有内容可拷贝, 可赋值.\\
+\\
+\textbf{缺点}:\\
+\indent C++ 中的隐式对象拷贝是很多性能问题和 bug 的根源. 拷贝构造函数降低了代码可读性, 相比传引用, 跟踪传值的对象更加困难, 对象修改的地方变得难以捉摸.\\
+\\
+\textbf{结论}:\\
+\indent 大部分类并不需要可拷贝, 也不需要一个拷贝构造函数或重载赋值运算符. 不幸的是, 如果你不主动声明它们, 编译器会为你自动生成, 而且是 public 的.\\
+\indent 可以考虑在类的 private: 中添加拷贝构造函数和赋值操作的空实现, 只有声明, 没有定义. 由于这些空函数声明为 private, 当其他代码试图使用它们的时候, 编译器将报错. 方便起见, 我们可以使用 DISALLOW\_COPY\_AND\_ASSIGN 宏:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// \emph{禁止使用拷贝构造函数和 operator= 赋值操作的宏}\\
+\indent /// \emph{应该类的 private: 中使用}\\
+\\
+\indent \#define DISALLOW\_COPY\_AND\_ASSIGN(TypeName) \textbackslash \\
+\indent             TypeName(const TypeName\&); \qquad \qquad \textbackslash \\
+\indent             void operator$=$(const TypeName\&)
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 在 class foo: 中: \\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent \indent class Foo \{\par
+\hspace{3ex}        DISALLOW\_COPY\_AND\_ASSIGN(Foo);\par
+\hspace{2ex}     public:\par
+\hspace{3ex}         Foo(int f);\par
+\hspace{3ex}         \raisebox{-6pt}{\LARGE\~{}}\normalsize Foo();\\
+\par
+\hspace{2ex}     private:\\
+
+\indent \indent \};
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 如上所述, 绝大多数情况下都应使用 DISALLOW\_COPY\_AND\_-ASSIGN 宏. 如果类确实需要可拷贝, 应在该类的头文件中说明原由, 并合理的定义拷贝构造函数和赋值操作. 注意在 operator$=$ 中检测自我赋值的情况 (即 operator$=$ 接收的参数是该对象本身).\\
+\indent 为了能作为 STL 容器的值, 你可能有使类可拷贝的冲动. 在大多数类似的情况下, \textbf{真正该做的是把对象的 \emph{指针} 放到 STL 容器中}. 可以考虑使用 shared\_ptr.
+
+\subsection{结构体 VS.类}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+仅当只有数据时使用 struct, 其它一概使用 class.\\
+\bottomrule
+\end{tabular}
+\end{table}
+在 C++ 中 struct 和 class 关键字几乎含义一样. 我们为这两个关键字添加我们自己的语义理解, 以便为定义的数据类型选择合适的关键字.\\
+\indent struct 用来定义包含数据的被动式对象, 也可以包含相关的常量, 但除了存取数据成员之外, 没有别的函数功能. 并且存取功能是通过直接访问位域 (field), 而非函数调用. 除了构造函数, 析构函数, Initialize(), Reset(), Validate() 外, 不能提供其它功能的函数.\\
+\indent 如果需要更多的函数功能, class 更适合. 如果拿不准, 就用 class.\\
+\indent 为了和 STL 保持一致, 对于仿函数 (functors) 和特性 (traits) 可以不用 class 而是使用 struct.\\
+\indent 注意: 类和结构体的成员变量使用 不同的命名规则.
+
+\subsection{继承}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+使用组合 (composition, 这一点也是 GoF 在 $<$$<$Design Patterns$>$$>$ 里反复强调的) 常常比使用继承更合理. 如果使用继承的话, 定义为 public 继承.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 当子类继承基类时, 子类包含了父基类所有数据及操作的定义. C++ 实践中, 继承主要用于两种场合: 实现继承 (implementation inheritance), 子类继承父类的实现代码; 接口继承 (interface inheritance), 子类仅继承父类的方法名称.\\
+\\
+\textbf{优点}:\\
+\indent 实现继承通过原封不动的复用基类代码减少了代码量. 由于继承是在编译时声明, 程序员和编译器都可以理解相应操作并发现错误. 从编程角度而言, 接口继承是用来强制类输出特定的 API. 在类没有实现 API 中某个必须的方法时, 编译器同样会发现并报告错误.\\
+\\
+\textbf{缺点}:\\
+\indent 对于实现继承, 由于子类的实现代码散布在父类和子类间之间, 要理解其实现变得更加困难. 子类不能重写父类的非虚函数, 当然也就不能修改其实现. 基类也可能定义了一些数据成员, 还要区分基类的实际布局.\\
+\\
+\textbf{结论}:\\
+\indent 所有继承必须是 public 的. 如果你想使用私有继承, 你应该替换成把基类的实例作为成员对象的方式.\\
+\indent 不要过度使用实现继承. 组合常常更合适一些. 尽量做到只在 ``是一个'' (``is-a'',  其他``has-a'' 情况下请使用组合) 的情况下使用继承: 如果 Bar 的确``是一种'' Foo, Bar 才能继承 Foo.\\
+\indent 必要的话, 析构函数声明为 virtual. 如果你的类有虚函数, 则析构函数也应该为虚函数. 注意 数据成员在任何情况下都必须是私有的.\\
+\indent 当重载一个虚函数, 在衍生类中把它明确的声明为 virtual. 理论依据: 如果省略 virtual 关键字, 代码阅读者不得不检查所有父类, 以判断该函数是否是虚函数.\\
+\\
+\\
+\subsection{多重继承}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+真正需要用到多重实现继承的情况少之又少. 只在以下情况我们才允许多重继承: 最多只有一个基类是非抽象类; 其它基类都是以大写I为开头的 \emph{纯接口类}.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 多重继承允许子类拥有多个基类. 要将作为 纯接口 的基类和具有 实现 的基类区别开来.\\
+\\
+\textbf{优点}:\\
+\indent 相比单继承 (见 \emph{继承}), 多重实现继承可以复用更多的代码.\\
+\\
+\textbf{缺点}:\\
+\indent 真正需要用到多重 实现 继承的情况少之又少. 多重实现继承看上去是不错的解决方案, 但你通常也可以找到一个更明确, 更清晰的不同解决方案.\\
+\\
+\textbf{结论}:\\
+\indent 只有当所有父类除第一个外都是 \emph{纯接口类} 时, 才允许使用多重继承. 为确保它们是纯接口, 这些类必须以大写I为前缀. \\
+\subsection{接口}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+接口是指满足特定条件的类, 这些类以大写I为前缀 (不强制).\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 当一个类满足以下要求时, 称之为纯接口:
+\begin{enumerate}
+\item
+只有纯虚函数 (``$=$0'') 和静态函数 (除了下文提到的析构函数).
+\item
+没有非静态数据成员.
+\item
+没有定义任何构造函数. 如果有, 也不能带有参数, 并且必须为 protected.
+\item
+如果它是一个子类, 也只能从满足上述条件并以大写I为前缀的类继承.
+\end{enumerate}
+接口类不能被直接实例化, 因为它声明了纯虚函数. 为确保接口类的所有实现可被正确销毁, 必须为之声明虚析构函数 (作为上述第 1 条规则的特例, 析构函数不能是纯虚函数). 具体细节可参考 Stroustrup 的 The C++ Programming Language, 3rd edition 第 12.4 节.\\
+\\
+\textbf{优点}:\\
+\indent 以大写I为前缀可以提醒其他人不要为该接口类增加函数实现或非静态数据成员. 这一点对于 \emph{多重继承} 尤其重要. 另外, 对于 Java 程序员来说, 接口的概念已是深入人心.\\
+\\
+\textbf{缺点}:\\
+\indent 接口特性作为实现细节不应暴露给用户.\\
+\\
+\textbf{结论}:\\
+\indent 只有在满足上述需要时, 类才以大写I开头, 但反过来, 满足上述需要的类未必一定以大写I开头.
+
+\subsection{运算符重载}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+除少数特定环境外，不要重载运算符.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 一个类可以定义诸如 + 和 / 等运算符, 使其可以像内建类型一样直接操作.\\
+\\
+\textbf{优点}:\\
+\indent 使代码看上去更加直观, 类表现的和内建类型 (如 int) 行为一致. 重载运算符使 Equals(), Add() 等函数名黯然失色. 为了使一些模板函数正确工作, 你可能必须定义操作符.\\
+\\
+\textbf{缺点}:\\
+\indent 虽然操作符重载令代码更加直观, 但也有一些不足:
+\begin{enumerate}
+\item
+混淆视听, 让你误以为一些耗时的操作和操作内建类型一样轻巧.
+\item
+更难定位重载运算符的调用点, 查找 Equals() 显然比对应的 $==$ 调用点要容易的多.
+\item
+有的运算符可以对指针进行操作, 容易导致 bug. Foo + 4 做的是一件事, 而 \&Foo + 4 可能做的是完全不同的另一件事. 对于二者, 编译器都不会报错, 使其很难调试;
+\end{enumerate}
+重载还有令你吃惊的副作用. 比如, 重载了 operator\& 的类不能被前置声明.\\
+\\
+\textbf{结论}:\\
+\indent 一般不要重载运算符. 尤其是赋值操作 (operator$=$) 比较诡异, 应避免重载. 如果需要的话, 可以定义类似 Equals(), CopyFrom() 等函数.\\
+\indent 然而, 极少数情况下可能需要重载运算符以便与模板或 ``标准'' C++ 类互操作 (如 operator$<$$<$(ostream\&, const T\&)). 只有被证明是完全合理的才能重载, 但你还是要尽可能避免这样做. 尤其是不要仅仅为了在 STL 容器中用作键值就重载 operator$==$ 或 operator$<$; 相反, 你应该在声明容器的时候, 创建相等判断和大小比较的仿函数类型.\\
+\indent 有些 STL 算法确实需要重载 operator$==$ 时, 你可以这么做, 记得别忘了在文档中说明原因.\\
+\indent 参考 \emph{拷贝构造函数}  和 \emph{函数重载}.
+\\
+\\
+\subsection{存取控制}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+将 \emph{所有} 数据成员声明为 private, 并根据需要提供相应的存取函数. 例如, 某个名为 foo\_ 的变量, 其取值函数是 get\_foo(). 还可能需要一个赋值函数 set\_foo().\\
+\bottomrule
+\end{tabular}
+\end{table}
+\textbf{一般在头文件中把存取函数定义成内联函数}.\\
+\indent 参考 \emph{继承} 和 \emph{函数命名}
+
+\subsection{声明顺序}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+在类中使用特定的声明顺序: public: 在 private: 之前, 成员函数在数据成员 (变量) 前;\\
+\bottomrule
+\end{tabular}
+\end{table}
+类的访问控制区段的声明顺序依次为: public:, protected:, private:. 如果某区段没内容, 可以不声明.\\
+\indent 每个区段内的声明通常按以下顺序:
+\begin{enumerate}
+\item[\labelitemi]
+typedefs 和枚举
+\item[\labelitemi]
+常量
+\item[\labelitemi]
+构造函数
+\item[\labelitemi]
+析构函数
+\item[\labelitemi]
+成员函数, 含静态成员函数
+\item[\labelitemi]
+数据成员, 含静态数据成员
+\end{enumerate}
+\indent 宏 DISALLOW\_COPY\_AND\_ASSIGN 的调用放在类的首行. 它通常是类的开始部分. 参考\emph{拷贝构造函数}.\\
+\indent .cpp 文件中函数的定义应尽可能和声明顺序一致.\\
+\indent 不要在类定义中内联大型函数. 通常, 只有那些没有特别意义或性能要求高, 并且是比较短小的函数才能被定义为内联函数. 更多细节参考 \emph{内联函数}.
+
+\subsection{编写简短函数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+倾向编写简短, 凝练的函数.\\
+\bottomrule
+\end{tabular}
+\end{table}
+我们承认长函数有时是合理的, 因此并不硬性限制函数的长度. 如果函数超过 40 行, 可以思索一下能不能在不影响程序结构的前提下对其进行分割.\\
+\indent 即使一个长函数现在工作的非常好, 一旦有人对其修改, 有可能出现新的问题. 甚至导致难以发现的 bug. 使函数尽量简短, 便于他人阅读和修改代码.\\
+\indent 在处理代码时, 你可能会发现复杂的长函数. 不要害怕修改现有代码: 如果证实这些代码在使用的过程中或者调试时都困难, 或者你需要使用其中的一小段代码, 考虑将其分割为更加简短并易于管理的若干函数.\\
+
+\subsection{笔记}
+\begin{enumerate}
+    \item 不在构造函数中做太多逻辑相关的初始化;
+
+    \item 编译器提供的默认构造函数不会对变量进行初始化, 如果定义了其他构造函数, 编译器不再提供, 需要编码者自行提供默认构造函数;
+
+    \item 为避免隐式转换, 需将单参数构造函数声明为 explicit;
+
+    \item 为避免拷贝构造函数, 赋值操作的滥用和编译器自动生成, 可将其声明为 private 且无需实现;
+
+    \item 仅在作为数据集合时使用 struct;
+
+    \item 组合 $>$ 实现继承 $>$ 接口继承 $>$ 私有继承, 子类重载的虚函数也要声明 virtual 关键字, 虽然编译器允许不这样做;
+    \item 避免使用多重继承, 使用时, 除一个基类含有实现外, 其他基类均为纯接口;
+    \item 接口类类名以大写I开头, 除提供带实现的虚析构函数, 静态成员函数外, 其他均为纯虚函数, 不定义非静态数据成员, 不提供构造函数, 提供的话，声明为 protected;
+    \item 为降低复杂性, 尽量不重载操作符, 模板和标准类中如果使用时需要提供文档说明;
+    \item 存取函数一般内联在头文件中;
+    \item 声明次序: public -$>$ protected -$>$ private;
+    \item 函数体尽量短小, 紧凑, 功能单一;
+
+\end{enumerate}
+\newpage
+
+\section{其他C++特性}
+\subsection{引用参数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+所有按引用传递的参数必须加上 const.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 在 C 语言中, 如果函数需要修改变量的值, 参数必须为指针, 如 int foo(int *pval). 在 C++ 中, 函数还可以声明引用参数: int foo(int \&val).\\
+\\
+\textbf{优点}:\\
+\indent 定义引用参数防止出现 (*pval)++ 这样丑陋的代码. 像拷贝构造函数这样的应用也是必需的. 而且更明确, 不接受 0 指针.\\
+\\
+\textbf{缺点}:\\
+\indent 容易引起误解, 因为引用在语法上是值变量却拥有指针的语义.\\
+\\
+\textbf{结论}:\\
+\indent 函数参数列表中, 所有引用参数都必须是 const:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+void Foo(const string \&in, string *out);
+\end{minipage}
+}
+\\
+\\
+\indent 事实上这在 Google Code 是一个硬性约定: 输入参数是值参或 const 引用, 输出参数为指针. 输入参数可以是 const 指针, 但决不能是 非 const 的引用参数.\\
+\indent 在以下情况你可以把输入参数定义为 const 指针: 你想强调参数不是拷贝而来的, 在对象生存周期内必须一直存在; 最好同时在注释中详细说明一下. bind2nd 和 mem\_fun 等 STL 适配器不接受引用参数, 这种情况下你也必须把函数参数声明成指针类型.
+
+\subsection{函数重载}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+仅在输入参数类型不同, 功能相同时使用重载函数 (含构造函数). 不要用函数重载模拟 缺省函数参数.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 你可以编写一个参数类型为 const string\& 的函数, 然后用另一个参数类型为 const char* 的函数重载它:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+class MyClass \{       \par
+\hspace{2ex}     public: \par
+\hspace{3ex}     void Analyze(const string \&text); \par
+\hspace{3ex}     void Analyze(const char *text, size\_t textlen); \\
+\};
+\end{minipage}
+}
+\\
+\\
+\textbf{优点}:\\
+\indent 通过重载参数不同的同名函数, 令代码更加直观. 模板化代码需要重载, 同时为使用者带来便利.\\
+\\
+\textbf{缺点}:\\
+\indent 限制使用重载的一个原因是在某个特定调用点很难确定到底调用的是哪个函数. 另一个原因是当派生类只重载了某个函数的部分变体, 会令很多人对继承的语义产生困惑. 此外在阅读库的用户代码时, 可能会因反对使用 缺省函数参数 造成不必要的费解.\\
+\\
+\textbf{结论}:\\
+\indent 如果你想重载一个函数, 考虑让函数名包含参数信息, 例如, 使用 AppendString(), AppendInt() 而不是 Append().
+
+\subsection{缺省参数}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+我们不允许使用缺省函数参数.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{优点}:\\
+\indent 多数情况下, 你写的函数可能会用到很多的缺省值, 但偶尔你也会修改这些缺省值. 无须为了这些偶尔情况定义很多的函数, 用缺省参数就能很轻松的做到这点.\\
+\\
+\textbf{缺点}:\\
+\indent 大家通常都是通过查看别人的代码来推断如何使用 API. 用了缺省参数的代码更难维护, 从老代码复制粘贴而来的新代码可能只包含部分参数. 当缺省参数不适用于新代码时可能会导致重大问题.\\
+\\
+\textbf{结论}:\\
+\indent 我们规定所有参数必须明确指定, 迫使程序员理解 API 和各参数值的意义, 避免默默使用他们可能都还没意识到的缺省参数.
+
+\subsection{变长数组和 alloca()}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+我们不允许使用变长数组和 alloca().\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{优点}:\\
+\indent 变长数组具有浑然天成的语法. 变长数组和 alloca() 也都很高效.\\
+\\
+\textbf{缺点}:\\
+\indent 变长数组和 alloca() 不是标准 C++ 的组成部分. 更重要的是, 它们根据数据大小动态分配堆栈内存, 会引起难以发现的内存越界 bugs: ``在我的机器上运行的好好的, 发布后却莫名其妙的挂掉了''.\\
+\\
+\textbf{结论}:\\
+\indent 使用安全的内存分配器, 如 scoped\_ptr / scoped\_array.\\
+
+\subsection{友元}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+我们允许合理的使用友元类及友元函数.\\
+\bottomrule
+\end{tabular}
+\end{table}
+通常友元应该定义在同一文件内, 避免代码读者跑到其它文件查找使用该私有成员的类. 经常用到友元的一个地方是将 FooBuilder 声明为 Foo 的友元, 以便 FooBuilder 正确构造 Foo 的内部状态, 而无需将该状态暴露出来. 某些情况下, 将一个单元测试类声明成待测类的友元会很方便.\\
+\indent 友元扩大了 (但没有打破) 类的封装边界. 某些情况下, 相对于将类成员声明为 public, 使用友元是更好的选择, 尤其是如果你只允许另一个类访问该类的私有成员时. 当然, 大多数类都只应该通过其提供的公有成员进行互操作.
+
+\subsection{异常}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+我们不使用 C++ 异常.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{优点}:
+\begin{enumerate}
+\item
+异常允许上层应用决定如何处理在底层嵌套函数中``不可能出现的'' 失败, 不像错误码记录那么含糊又易出错;
+\item
+很多现代语言都使用异常. 引入异常使得 C++ 与 Python, Java 以及其它 C++ 相近的语言更加兼容.
+\item
+许多第三方 C++ 库使用异常, 禁用异常将导致很难集成这些库.
+\item
+异常是处理构造函数失败的唯一方法. 虽然可以通过工厂函数或 Init() 方法替代异常, 但他们分别需要堆分配或新的``无效'' 状态；
+\item
+在测试框架中使用异常确实很方便.
+\end{enumerate}
+\textbf{缺点}:
+\begin{enumerate}
+\item
+在现有函数中添加 throw 语句时, 你必须检查所有调用点. 所有调用点得至少有基本的异常安全保护, 否则永远捕获不到异常, 只好``开心的'' 接受程序终止的结果. 例如, 如果 f() 调用了 g(), g() 又调用了 h(), h 抛出的异常被 f 捕获, g 要当心了, 很可能会因疏忽而未被妥善清理.
+\item
+更普遍的情况是, 如果使用异常, 光凭查看代码是很难评估程序的控制流: 函数返回点可能在你意料之外. 这会导致代码管理和调试困难. 你可以通过规定何时何地如何使用异常来降低开销, 但是让开发人员必须掌握并理解这些规定带来的代价更大.
+\item
+异常安全要求同时采用 RAII 和不同编程实践. 要想轻松编写正确的异常安全代码, 需要大量的支撑机制配合. 另外, 要避免代码读者去理解整个调用结构图, 异常安全代码必须把写持久化状态的逻辑部分隔离到 “提交” 阶段. 它在带来好处的同时, 还有成本 (也许你不得不为了隔离 ``提交'' 而整出令人费解的代码). 允许使用异常会驱使我们不断为此付出代价, 即使我们觉得这很不划算.
+\item
+启用异常使生成的二进制文件体积变大, 延长了编译时间 (或许影响不大), 还可能增加地址空间压力;
+\item
+异常的实用性可能会怂恿开发人员在不恰当的时候抛出异常, 或者在不安全的地方从异常中恢复. 例如, 处理非法用户输入时就不应该抛出异常. 如果我们要完全列出这些约束, 这份风格指南会长出很多!
+\end{enumerate}
+\textbf{结论}:\\
+\indent 从表面上看, 使用异常利大于弊, 尤其是在新项目中. 但是对于现有代码, 引入异常会牵连到所有相关代码. 如果新项目允许异常向外扩散, 在跟以前未使用异常的代码整合时也将是个麻烦. 因为 Google 现有的大多数 C++ 代码都没有异常处理, 引入带有异常处理的新代码相当困难.\\
+\indent 鉴于 Google 现有代码不接受异常, 在现有代码中使用异常比在新项目中使用的代价多少要大一些. 迁移过程比较慢, 也容易出错. 我们不相信异常的使用是有效替代方案, 如错误代码, 断言等会造成严重负担.\\
+\indent 我们并不是基于哲学或道德层面反对使用异常, 而是在实践的基础上. 我们希望在 Google 使用我们自己的开源项目, 但项目中使用异常会为此带来不便, 因此我们也建议不要在 Google 的开源项目中使用异常. 如果我们需要把这些项目推倒重来显然不太现实.\\
+\indent 对于 Windows 代码来说, 有个 特例.\\
+\indent (注: 对于异常处理, 显然不是短短几句话能够说清楚的, 以构造函数为例, 很多 C++ 书籍上都提到当构造失败时只有异常可以处理, Google 禁止使用异常这一点, 仅仅是为了自身的方便, 说大了, 无非是基于软件管理成本上, 实际使用中还是自己决定)
+
+
+\subsection{运行时类型识别}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+我们禁止使用 RTTI.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent RTTI 允许程序员在运行时识别 C++ 类对象的类型.\\
+\\
+\textbf{优点}:\\
+\indent RTTI 在某些单元测试中非常有用. 比如进行工厂类测试时, 用来验证一个新建对象是否为期望的动态类型.\\
+\indent 除测试外, 极少用到.\\
+\\
+\textbf{缺点}:\\
+\indent 在运行时判断类型通常意味着设计问题. 如果你需要在运行期间确定一个对象的类型, 这通常说明你需要考虑重新设计你的类.\\
+\\
+\textbf{结论}:\\
+\indent 除单元测试外, 不要使用 RTTI. 如果你发现自己不得不写一些行为逻辑取决于对象类型的代码, 考虑换一种方式判断对象类型.\\
+\indent 如果要实现根据子类类型来确定执行不同逻辑代码, 虚函数无疑更合适. 在对象内部就可以处理类型识别问题.\\
+\indent 如果要在对象外部的代码中判断类型, 考虑使用双重分派方案, 如访问者模式. 可以方便的在对象本身之外确定类的类型.\\
+\indent 如果你认为上面的方法你真的掌握不了, 你可以使用 RTTI, 但务必请三思 :-) . 不要试图手工实现一个貌似 RTTI 的替代方案, 我们反对使用 RTTI 的理由, 同样适用于那些在类型继承体系上使用类型标签的替代方案.
+
+\subsection{类型转换}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+使用 C++ 的类型转换, 如 static\_cast$<$$>$(). 不要使用 int y = (int)x 或 int y = int(x) 等转换方式;\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent C++ 采用了有别于 C 的类型转换机制, 对转换操作进行归类.\\
+\\
+\textbf{优点}:\\
+\indent C 语言的类型转换问题在于模棱两可的操作; 有时是在做强制转换 (如 (int)3.5), 有时是在做类型转换 (如 (int)``hello''). 另外, C++ 的类型转换在查找时更醒目.\\
+\\
+\textbf{缺点}:\\
+\indent 恶心的语法.\\
+\\
+\textbf{结论}:\\
+\indent 不要使用 C 风格类型转换. 而应该使用 C++ 风格.
+\begin{enumerate}
+\item
+用 static\_cast 替代 C 风格的值转换, 或某个类指针需要明确的向上转换为父类指针时.
+\item
+用 const\_cast 去掉 const 限定符.
+\item
+用 reinterpret\_cast 指针类型和整型或其它指针之间进行不安全的相互转换. 仅在你对所做一切了然于心时使用.
+\item
+dynamic\_cast 测试代码以外不要使用. 除非是单元测试, 如果你需要在运行时确定类型信息, 说明有 设计缺陷.
+\end{enumerate}
+\subsection{流}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+只在记录日志时使用流.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 流用来替代 printf() 和 scanf().\\
+\\
+\textbf{优点}:\\
+\indent 有了流, 在打印时不需要关心对象的类型. 不用担心格式化字符串与参数列表不匹配 (虽然在 gcc 中使用 printf 也不存在这个问题). 流的构造和析构函数会自动打开和关闭对应的文件.\\
+\\
+\textbf{缺点}:\\
+\indent 流使得 pread() 等功能函数很难执行. 如果不使用 printf 风格的格式化字符串, 某些格式化操作 (尤其是常用的格式字符串 \%.\raisebox{-3pt}{*}s) 用流处理性能是很低的. 流不支持字符串操作符重新排序 (\%1s), 而这一点对于软件国际化很有用.\\
+\\
+\textbf{结论}:\\
+\indent 不要使用流, 除非是日志接口需要. 使用 printf 之类的代替.\\
+\indent 使用流还有很多利弊, 但代码一致性胜过一切. 不要在代码中使用流.
+\\
+\textbf{拓展讨论}:\\
+\indent 对这一条规则存在一些争论, 这儿给出点深层次原因. 回想一下唯一性原则 (Only One Way): 我们希望在任何时候都只使用一种确定的 I/O 类型, 使代码在所有 I/O 处都保持一致. 因此, 我们不希望用户来决定是使用流还是 printf + read/write. 相反, 我们应该决定到底用哪一种方式. 把日志作为特例是因为日志是一个非常独特的应用, 还有一些是历史原因.\\
+\indent 流的支持者们主张流是不二之选, 但观点并不是那么清晰有力. 他们指出的流的每个优势也都是其劣势. 流最大的优势是在输出时不需要关心打印对象的类型. 这是一个亮点. 同时, 也是一个不足: 你很容易用错类型, 而编译器不会报警. 使用流时容易造成的这类错误:
+\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+cout $<$$<$ this;   /// Prints the address\\
+cout $<$$<$ *this;  /// Prints the contents
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 由于 $<$$<$ 被重载, 编译器不会报错. 就因为这一点我们反对使用操作符重载.\\
+\indent 有人说 printf 的格式化丑陋不堪, 易读性差, 但流也好不到哪儿去. 看看下面两段代码吧, 实现相同的功能, 哪个更清晰?
+\\
+\fbox{
+\begin{minipage}{400pt}
+cerr $<$$<$``Error connecting to '' $<$$<$ foo$-$$>$bar()$-$$>$hostname.first\par
+\hspace{3ex}     $<$$<$ ``:'' $<$$<$ foo$-$$>$bar()$-$$>$hostname.second $<$$<$ ``: '' \par
+\hspace{3ex}  $<$$<$ strerror(errno);\\
+\\
+fprintf(stderr,``Error connecting to`\%s:\%u:\%s'',\par
+\hspace{3ex}        foo$-$$>$bar()$-$$>$hostname.first, foo$-$$>$bar()$-$$>$hostname.second,\par
+\hspace{3ex}        strerror(errno));
+\end{minipage}
+}
+\indent 你可能会说, ``把流封装一下就会比较好了'', 这儿可以, 其他地方呢? 而且不要忘了, 我们的目标是使语言更紧凑, 而不是添加一些别人需要学习的新装备.\\
+\indent 每一种方式都是各有利弊, ``没有最好, 只有更适合''. 简单性原则告诫我们必须从中选择其一, 最后大多数决定采用 printf + read/write.
+
+\subsection{前置自增和自减}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+对于迭代器和其他模板对象使用前缀形式 (++i) 的自增, 自减运算符.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 对于变量在自增 (++i 或 i++) 或自减 ($-$$-$i 或 i$-$$-$) 后表达式的值又没有没用到的情况下, 需要确定到底是使用前置还是后置的自增 (自减).\\
+\\
+\textbf{优点}:\\
+\indent 不考虑返回值的话, 前置自增 (++i) 通常要比后置自增 (i++) 效率更高. 因为后置自增 (或自减) 需要对表达式的值 i 进行一次拷贝. 如果 i 是迭代器或其他非数值类型, 拷贝的代价是比较大的. 既然两种自增方式实现的功能一样, 为什么不总是使用前置自增呢?\\
+\\
+\textbf{缺点}:\\
+\indent 在 C 开发中, 当表达式的值未被使用时, 传统的做法是使用后置自增, 特别是在 for 循环中. 有些人觉得后置自增更加易懂, 因为这很像自然语言, 主语 (i) 在谓语动词 (++) 前.\\
+\\
+\textbf{结论}:\\
+\indent 对简单数值 (非对象), 两种都无所谓. 对迭代器和模板类型, 使用前置自增 (自减).
+
+\subsection{const的使用}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+我们强烈建议你在任何可能的情况下都要使用 const.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent 在声明的变量或参数前加上关键字 const 用于指明变量值不可被篡改 (如 const int foo ). 为类中的函数加上 const 限定符表明该函数不会修改类成员变量的状态 (如 class Foo \{ int Bar(char c) const; \};).\\
+\\
+\textbf{优点}:\\
+\indent 大家更容易理解如何使用变量. 编译器可以更好地进行类型检测, 相应地, 也能生成更好的代码. 人们对编写正确的代码更加自信, 因为他们知道所调用的函数被限定了能或不能修改变量值. 即使是在无锁的多线程编程中, 人们也知道什么样的函数是安全的.\\
+\\
+\textbf{缺点}:\\
+\indent const 是入侵性的: 如果你向一个函数传入 const 变量, 函数原型声明中也必须对应 const 参数 (否则变量需要 const\_cast 类型转换), 在调用库函数时显得尤其麻烦.\\
+\\
+\textbf{结论}:\\
+\indent const 变量, 数据成员, 函数和参数为编译时类型检测增加了一层保障; 便于尽早发现错误. 因此, 我们强烈建议在任何可能的情况下使用 const:
+\begin{enumerate}
+\item
+如果函数不会修改传入的引用或指针类型参数, 该参数应声明为 const.
+\item
+尽可能将函数声明为 const. 访问函数应该总是 const. 其他不会修改任何数据成员, 未调用非 const 函数, 不会返回数据成员非 const 指针或引用的函数也应该声明成 const.
+\item
+如果数据成员在对象构造之后不再发生变化, 可将其定义为 const.
+\end{enumerate}
+\indent 然而, 也不要发了疯似的使用 const. 像 const int * const * const x; 就有些过了, 虽然它非常精确的描述了常量 x. 关注真正有帮助意义的信息: 前面的例子写成 const int** x 就够了.\\
+\indent 关键字 mutable 可以使用, 但是在多线程中是不安全的, 使用时首先要考虑线程安全.\\
+\\
+\textbf{const 的位置}:\\
+\indent 有人喜欢 int const *foo 形式, 不喜欢 const int* foo, 他们认为前者更一致因此可读性也更好: 遵循了 const 总位于其描述的对象之后的原则. 但是一致性原则不适用于此, ``不要过度使用'' 的声明可以取消大部分你原本想保持的一致性. 将 const 放在前面才更易读, 因为在自然语言中形容词 (const) 是在名词 (int) 之前.\\
+\indent 这是说, 我们提倡但不强制 const 在前. 但要保持代码的一致性! (也就是不要在一些地方把 const 写在类型前面, 在其他地方又写在后面, 确定一种写法, 然后保持一致.)
+
+\subsection{整型}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+C++ 内建整型中, 仅使用 int. 如果程序中需要不同大小的变量, 可以使用 $<$stdint.h$>$中长度精确的整型, 如 int16\_t. 这是C99标准，建议使用.临时变量可以使用int，其他应该尽量使用对应类型，如下：\\
+\indent int8\_t(char) \qquad  uint8\_t\\
+\indent int16\_t \qquad \qquad uint16\_t\\
+\indent int32\_t \qquad \qquad uint32\_t\\
+\indent int64\_t \qquad \qquad uint64\_t
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent C++ 没有指定整型的大小. 通常人们假定 short 是 16 位, int是 32 位, long 是 32 位, long long 是 64 位.\\
+\\
+\textbf{优点}:\\
+\indent 保持声明统一.\\
+\\
+\textbf{缺点}:\\
+\indent C++ 中整型大小因编译器和体系结构的不同而不同.\\
+\\
+\textbf{结论}:\\
+\indent $<$stdint.h$>$ 定义了 int16\_t, uint32\_t, int64\_t 等整型, 在需要确保整型大小时可以使用它们代替 short, unsigned long long 等. 在 C 整型中, 只使用 int. 在合适的情况下, \textbf{推荐使用标准类型如 size\_t 和 ptrdiff\_t}.\\
+\indent 如果已知整数不会太大, 我们常常会使用 int, 如循环计数. 在类似的情况下使用原生类型 int. 你可以认为 int 至少为 32 位, 但不要认为它会多于 32 位. 如果需要 64 位整型, 用 int64\_t 或 uint64\_t.\\
+\indent 对于大整数, 使用 int64\_t.\\
+\indent \textbf{不要使用 uint32\_t 等无符号整型}, 除非你是在表示一个位组而不是一个数值, 或是你需要定义二进制补码溢出. 尤其是不要为了指出数值永不会为负, 而使用无符号类型. 相反, 你应该使用断言来保护数据.\\
+\\
+\textbf{关于无符号整数}:\\
+\indent 有些人, 包括一些教科书作者, 推荐使用无符号类型表示非负数. 这种做法试图达到自我文档化. 但是, 在 C 语言中, 这一优点被由其导致的 bug 所淹没. 看看下面的例子:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+for (unsigned int i $=$ foo.Length()-1; i $>$= 0; $-$$-$i) \dots
+\end{minipage}
+}
+\\
+\indent 上述循环永远不会退出! 有时 gcc 会发现该 bug 并报警, 但大部分情况下都不会. 类似的 bug 还会出现在比较有符合变量和无符号变量时. 主要是 C 的类型提升机制会致使无符号类型的行为出乎你的意料.\\
+\indent 因此, \textbf{使用断言来指出变量为非负数, 而不是使用无符号型!}\\
+
+\subsection{64位下的可移植性}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+代码应该对 64 位和 32 位系统友好. 处理打印, 比较, 结构体对齐时应切记:\\
+\bottomrule
+\end{tabular}
+\end{table}
+\begin{enumerate}
+\item
+对于某些类型, printf() 的指示符在 32 位和 64 位系统上可移植性不是很好. C99 标准定义了一些可移植的格式化指示符. 不幸的是, MSVC 7.1 并非全部支持, 而且标准中也有所遗漏, 所以有时我们不得不自己定义一个丑陋的版本 (头文件 inttypes.h 仿标准风格):\\
+\\
+\fbox{
+\begin{minipage}{370pt}
+\indent \indent /// printf macros for size\_t, in the style of inttypes.h\\
+\indent \indent \#ifdef \_LP64\\
+\indent \indent \#define \_\_PRIS\_PREFIX ``z''\\
+\indent \indent \#else\\
+\indent \indent \#define \_\_PRIS\_PREFIX\\
+\indent \indent \#endif\\
+\\
+\indent \indent /// Use these macros after a \% in a printf format string\\
+\indent \indent /// to get correct $32$/$64$ bit behavior, like this:\\
+\indent \indent /// size\_t size $=$ records.size();\\
+\indent \indent /// printf(``\%''PRIuS ``\textbackslash n'', size);\\
+\indent \indent \#define PRIdS \_\_PRIS\_PREFIX ``d'' \\
+\indent \indent \#define PRIxS \_\_PRIS\_PREFIX ``x'' \\
+\indent \indent \#define PRIuS \_\_PRIS\_PREFIX ``u'' \\
+\indent \indent \#define PRIXS \_\_PRIS\_PREFIX ``X'' \\
+\indent \indent \#define PRIoS \_\_PRIS\_PREFIX ``o''
+\end{minipage}
+}
+\\
+\\
+\\
+\begin{table}[htbp]
+\flushright
+\begin{tabular}{llll}
+\toprule
+类型 & 不要使用 & 使用 & 备注\\
+\midrule
+\small{void *(或其他指针类型)}&\small{\%lx}&\small{\%p}&\\
+\small{int64\_t}&\small{\%qd,\%lld}&\small{\%``PRId64''}&\\
+\small{uint64\_t}&\small{\%qu, \%llu, \%llx}&\small{\%``PRIu64'', \%``PRIx64''}&\\
+\small{size\_t}&\small{\%u}&\small{\%``PRIuS'', \%``PRIxS''}&\small{C99 规定 \%zu}\\
+\small{ptrdiff\_t}&\small{\%d}&\small{\%``PRIdS''}&\small{C99 规定 \%zd}\\
+\bottomrule
+\end{tabular}
+\end{table}
+注意 PRI* 宏会被编译器扩展为独立字符串. 因此如果使用非常量的格式化字符串, 需要将宏的值而不是宏名插入格式中. 使用 PRI* 宏同样可以在 \% 后包含长度指示符. 例如, printf(``x = \%30''PRIuS``\textbackslash n'', x) 在 32 位 Linux 上将被展开为 printf(``x = \%30'' ``u'' ``\textbackslash n'', x), 编译器当成 printf(``x = \%30u\textbackslash n'', x) 处理 (这在 MSVC 6.0 上行不通, VC 6 编译器不会自动把引号间隔的多个字符串连接一个长字符串).
+\item
+记住 sizeof(void *) != sizeof(int). 如果需要一个指针大小的整数要用 intptr\_t.
+\item
+你要非常小心的对待结构体对齐, 尤其是要持久化到磁盘上的结构体 (持久化 - 将数据按字节流顺序保存在磁盘文件或数据库中). 在 64 位系统中, 任何含有 int64\_t/uint64\_t 成员的类/结构体, 缺省都以 8 字节在结尾对齐. 如果 32 位和 64 位代码要共用持久化的结构体, 需要确保两种体系结构下的结构体对齐一致. 大多数编译器都允许调整结构体对齐. gcc 中可使用 \_\_attribute\_\_((packed)). MSVC 则提供了 \#pragma pack() 和 \_\_declspec(align()) ( 解决方案的项目属性里也可以直接设置).
+\item
+创建 64 位常量时使用 LL 或 ULL 作为后缀, 如:\\
+\fbox{
+\begin{minipage}{370pt}
+int64\_t my\_value = 0x123456789LL;\\
+uint64\_t my\_mask = 3ULL$<$$<$48;
+\end{minipage}
+}
+\item
+\textbf{如果你确实需要 32 位和 64 位系统具有不同代码, 可以使用 \#ifdef \_LP64 指令来切分 32/64 位代码}. (尽量不要这么做, 如果非用不可, 尽量使修改局部化)
+\end{enumerate}
+
+\subsection{预处理宏}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+使用宏时要非常谨慎, 尽量以内联函数, 枚举和常量代替之.\\
+\bottomrule
+\end{tabular}
+\end{table}
+宏意味着你和编译器看到的代码是不同的. 这可能会导致异常行为, 尤其因为宏具有全局作用域.\\
+\indent 值得庆幸的是, C++ 中, 宏不像在 C 中那么必不可少. 以往用宏展开性能关键的代码, 现在可以用内联函数替代. 用宏表示常量可被 const 变量代替. 用宏 ``缩写'' 长变量名可被引用代替. 用宏进行条件编译\dots 这个, 千万别这么做, 会令测试更加痛苦 (\#define 防止头文件重包含当然是个特例).\\
+\indent 宏可以做一些其他技术无法实现的事情, 在一些代码库 (尤其是底层库中) 可以看到宏的某些特性 (如用 \# 字符串化, 用 \#\# 连接等等). 但在使用前, 仔细考虑一下能不能不使用宏达到同样的目的.\\
+\indent 下面给出的用法模式可以避免使用宏带来的问题; 如果你要宏, 尽可能遵守:\\
+\begin{enumerate}
+\item
+不要在 .h 文件中定义宏.
+\item
+在马上要使用时才进行 \#define, 使用后要立即 \#undef.
+\item
+不要只是对已经存在的宏使用\#undef，选择一个不会冲突的名称；
+\item
+不要试图使用展开后会导致 C++ 构造不稳定的宏, 不然也至少要附上文档说明其行为.
+\end{enumerate}
+
+\subsection{0 和 NULL}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+整数用 0, 实数用 0.0, 指针用0, 字符 (串) 用 `\textbackslash 0'.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+整数用 0, 实数用 0.0, 这一点是毫无争议的.\\
+\indent 对于指针 (地址值), 到底是用 0 还是 NULL, Bjarne Stroustrup 建议使用最原始的 0. 我们建议使用指针用0的方式.\\
+\indent 字符 (串) 用 `\textbackslash 0', 不仅类型正确而且可读性好.\\
+
+\subsection{sizeof}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+尽可能用 sizeof(varname) 代替 sizeof(type).\\
+\bottomrule
+\end{tabular}
+\end{table}
+使用 sizeof(varname) 是因为当代码中变量类型改变时会自动更新. 某些情况下 sizeof(type) 或许有意义, 但还是要尽量避免, 因为它会导致变量类型改变后不能同步.\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent Struct data;\\
+\indent Struct data; memset(\&data, 0, sizeof(data));
+\end{minipage}
+}
+\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+memset(\&data, 0, sizeof(Struct));
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\subsection{Boost库}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+只使用 Boost 中被认可的库.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{定义}:\\
+\indent Boost 库集 是一个广受欢迎, 经过同行鉴定, 免费开源的 C++ 库集.\\
+\\
+\textbf{优点}:\\
+\indent Boost代码质量普遍较高, 可移植性好, 填补了 C++ 标准库很多空白, 如型别的特性, 更完善的绑定器, 更好的智能指针, 同时还提供了 TR1 (标准库扩展) 的实现.\\
+\\
+\textbf{缺点}:\\
+\indent 某些 Boost 库提倡的编程实践可读性差, 比如元编程和其他高级模板技术, 以及过度 ``函数化'' 的编程风格.\\
+\\
+\textbf{结论}:\\
+\indent 为了向阅读和维护代码的人员提供更好的可读性, 我们只允许使用 Boost 一部分经认可的特性子集. 目前允许使用以下库:
+\begin{enumerate}
+\item
+Compressed Pair : boost/compressed\_pair.hpp
+\item
+Pointer Container : boost/ptr\_container (序列化除外)
+\item
+Array : boost/array.hpp
+\item
+The Boost Graph Library (BGL) : boost/graph (序列化除外)
+\item
+Property Map : boost/property\_map.hpp
+\item
+Iterator 中处理迭代器定义的部分 : boost/iterator/iterator\_adaptor.hpp, boost/iterator/iterator\_facade.hpp, 以及 boost/function\_output\_iterator.hpp
+\end{enumerate}
+\indent 我们正在积极考虑增加其它 Boost 特性, 所以列表中的规则将不断变化.
+\newpage
+
+\section{命名约定}
+最重要的一致性规则是命名管理. 命名风格快速获知名字代表是什么东东: 类型? 变量? 函数? 常量? 宏 ... ? 甚至不需要去查找类型声明. 我们大脑中的模式匹配引擎可以非常可靠的处理这些命名规则.\\
+\indent 命名规则具有一定随意性, 但相比按个人喜好命名, 一致性更重, 所以不管你怎么想, 规则总归是规则.
+
+\subsection{通用命名规则}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+函数命名, 变量命名, 文件命名应具备描述性; 不要过度缩写. 类型和变量应该是名词, 函数名可以用 ``命令性'' 动词.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{如何命名}:\\
+\indent 尽可能给出描述性的名称. 不要节约行空间, 让别人很快理解你的代码更重要. 好的命名风格:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+int iNumErrors;       /// Good.\\
+int iNumCompletedConnections;   /// Good.
+\end{minipage}
+}
+\\
+\\
+\\
+糟糕的命名使用含糊的缩写或随意的字符:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent int n;   \qquad \qquad                    /// Bad - meaningless.\\
+\indent int iNErr;     \qquad           /// Bad - ambiguous abbreviation.\\
+\indent int iNCompConns;                /// Bad - ambiguous abbreviation.
+\end{minipage}
+}
+\\
+\\
+\\
+类型和变量名一般为名词: 如 FileOpener, NumErrors.\\
+\indent 函数名通常是指令性的 (确切的说它们应该是命令), 如 openFile(), setNumErrors(). 存取值函数的函数名以set\textbackslash{}get开头(在 \emph{函数命名} 处详细阐述), 剩余部分和它要取值的变量同名.\\
+\\
+\textbf{缩写}:\\
+\indent 除非该缩写在其它地方都非常普遍, 否则不要使用. 例如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// Good\\
+\indent /// These show proper names with no abbreviations.\\
+\indent int iNumDnsConnections;  /// 大部分人都知道 ``DNS'' 是啥意思.\\
+\indent int iPriceCountReader;   /// OK, price count. 有意义.
+\end{minipage}
+}
+\\
+\\
+\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning\\
+\midrule
+\fbox{
+\begin{minipage}{390pt}
+/// Bad!\\
+/// Abbreviations can be confusing or ambiguous outside a small group.\\
+\indent int iWgcConnections;  /// Only your group knows what this stands for.\\
+\indent int iPcReader;        /// Lots of things can be abbreviated ``pc''.
+\end{minipage}
+}\\
+\bottomrule
+\end{tabular}
+\end{table}
+\\
+\indent
+应使用完整的单词或大家基本可以理解的缩写，避免使人误解.常用缩写形式如下：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+完整单词   \hspace{6ex}   可缩写形式\\
+temp       \hspace{12ex}    tmp\\
+flag \hspace{14ex}  flg\\
+length \hspace{11ex}  len\\
+statistic \hspace{9ex}  stat\\
+source \hspace{11ex}  src\\
+destination \hspace{6ex}  dst\\
+message \hspace{9ex}  msg
+\end{minipage}
+}
+\\
+\\
+\\
+永远不要用省略字母的缩写:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent int error\_count;  /// Good.\\
+\indent int error\_cnt;    /// Bad.
+\end{minipage}
+}
+\\
+\\
+\\
+注：命名中若使用特殊约定或缩写，则应该在源文件的开始处注释说明.
+\subsection{文件命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+文件名要全部小写, 可以包含下划线 (\_) . 按项目约定来.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+可接受的文件命名:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent my\_useful\_class.cpp\\
+\indent myusefulclass.cpp
+\end{minipage}
+}
+\\
+\\
+\\
+\indent C++ 文件要以 .cpp 结尾, 头文件以 .h 结尾.\\
+\indent 不要使用已经存在于 /usr/include 下的文件名 (即编译器搜索系统头文件的路径), 如 db.h.\\
+\indent 通常应尽量让文件名更加明确. http\_server\_logs.h 就比 logs.h 要好. 定义类时文件名一般成对出现, 如 foo\_bar.h 和 foo\_bar.cpp, 对应于类 FooBar.\\
+\indent 内联函数必须放在 .h 文件中. 如果内联函数比较短, 就直接放在 .h 中. 如果代码比较长, 可以放到以 \_inl.h 结尾的文件中. 对于包含大量内联代码的类, 可以使用三个文件:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent url\_table.h      /// The class declaration.\\
+\indent url\_table.cpp     /// The class definition.\\
+\indent url\_table\_inl.h  /// Inline functions that include lots of code.
+\end{minipage}
+}
+\\
+\\
+\\
+参考 \_inl.h 文件 一节.\\
+\indent 注意：如果文件中是类，则文件名是类名+后缀（.h, .cpp, \_inl.h），如果类名首字母大写,对应的所有文件首字母大写。  但是若文件为C风格的头文件或 实现文件，则首字母应该小写。
+
+\subsection{类型命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+类型名称的每个单词首字母均大写, 不包含下划线: MyExcitingClass, MyExcitingEnum.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+所有类型命名 —— 类, 结构体, 类型定义 (typedef), 枚举 —— 均使用相同约定. 例如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// classes and structs\\
+\indent class UrlTable \{ ...\\
+\indent class UrlTableTester \{ ...\\
+\indent struct UrlTableProperties \{ ...\\
+\indent \\
+\indent /// typedefs\\
+\indent typedef hash\_map$<$UrlTableProperties *, string$>$ PropertiesMap;\\
+\indent \\
+\indent /// enums\\
+\indent enum UrlTableErrors \{ ...\\
+\end{minipage}
+}
+\\
+\\
+\\
+\subsection{变量命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+变量命名方式为属性+类型+名称，类的成员变量以下划线结尾, 应使用完整的单词或大家基本可以理解的缩写，避免使人误解.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{普通变量命名}:\\
+变量命名方式为属性+类型+名称，对于变量命名，禁止取单个字符(如i,j,k)，
+但i,j,k作局部循环变量是允许的.举例:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+int lv\_iWidth; \\
+vector$<$int$>$ m\_pvctWidth;
+\end{minipage}
+}
+\\
+\\
+\\
+其变量名解释如下：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+l \hspace{7ex}   作用域属性——局部变量(Local)\\
+v \hspace{6ex}   存储属性——变量(Variable)\\
+i \hspace{7ex} 数据类型——整型(Interger)\\
+p \hspace{6ex} 指针(pointer)\\
+vct \hspace{5ex} std::vector\\
+Width \hspace{1ex} 变量名
+\end{minipage}
+}
+\\
+\\
+\\
+其中作用属性包括如下选项：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+l \hspace{8ex} 局部变量(Local)\\
+g \hspace{8ex}全局变量（Global）\\
+m \hspace{7ex}成员变量（Member）\\
+s \hspace{8ex}静态变量（Static）
+\end{minipage}
+}
+\\
+\\
+\\
+存储属性包括如下选项：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+v\hspace{8ex}变量（Variable）\\
+c\hspace{8ex}常量（Const）
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 如果变量名中包含l或者v属性，为了简化可以省略，比如lv\_iWidth可以写成iWidth.\\
+\\
+在数据类型中，对于指针类型，需要说明指针的具体类型，如lv\_pi-Width表示int*类型的指针.
+数据类型包括如下选项：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+i\hspace{12ex}int\\
+c\hspace{11ex}char\\
+b\hspace{11ex}bool\\
+a\hspace{11ex}arry(数组)\\
+u\hspace{11ex}unsigned int\\
+n\hspace{11ex}short int\\
+l\hspace{12ex}long\\
+f\hspace{12ex}float\\
+d\hspace{11ex}double\\
+ul\hspace{10ex}unsigned long (DWORD)\\
+us\hspace{10ex}unsigned short(WORD)\\
+v\hspace{11ex}void\\
+p\hspace{11ex}pointer(指针)\\
+h\hspace{11ex}handle(句柄)\\
+f\hspace{11ex}flags(位变量)\\
+by\hspace{10ex}byte(unsigned char)\\
+fn\hspace{10ex}function(函数)
+\end{minipage}
+}
+\\
+\\
+\\
+对于自定义的结构体，或者类，其类型表示默认为o——object，
+在和下列选项不冲突的情况下，可以约定类型缩写，但要注释说明.
+约定类型缩写包括如下选项：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+str\hspace{11ex}std::string\\
+map\hspace{10ex}std::map\\
+vct\hspace{11ex}std::vector\\
+q\hspace{13ex}std::queue\\
+pair\hspace{10ex}std::pair\\
+stk\hspace{11ex}std::stk\\
+set\hspace{11ex}std::set\\
+it\hspace{12ex}std::iterator
+\end{minipage}
+}
+\\
+\\
+\\
+更多示例如下：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+std::string\hspace{5ex}g\_strIdentifier;\\
+SysClass\hspace{6ex}s\_poInstance;\\
+const int\hspace{6ex}gc\_iThreshold;
+\end{minipage}
+}
+\\
+\\
+\\
+\noindent
+\textbf{结构体变量}:\\
+\indent 结构体的数据成员可以和普通变量一样命名，不需要在前面加m\_:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent struct UrlTableProperties \{\par
+\hspace{3ex}     string strName;\par
+\hspace{3ex}     int iNumEntries;\\
+\indent \}
+\end{minipage}
+}
+\\
+\\
+\\
+结构体与类的讨论参考 结构体 vs. 类 一节.\\
+\\
+\textbf{全局变量}:\\
+对全局变量没有特别要求, 少用就好, 但如果你要用, 可以用 g\_ 或其它标志作为前缀, 以便更好的区分局部变量.\\
+
+\subsection{常量命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+在名称前加 c: cDaysInAWeek.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+所有编译时常量, 无论是局部的, 全局的还是类中的, 和其他变量稍微区别一下. c\_后接大写字母开头的单词:\\
+const int c\_iDaysInAWeek = 7;
+
+\subsection{函数命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+常规函数使用大小写混合, 取值和设值函数则要求与变量名匹配.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{常规函数}:\\
+函数名的每个单词首字母小写, 没有下划线:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent addTableEntry()\\
+\indent deleteUrl()
+\end{minipage}
+}
+\\
+\\
+\\
+\textbf{取值和设值函数}:\\
+\indent 取值和设值函数要与存取的变量名匹配. 这儿摘录一个类, num\_entries\_ 是该类的实例变量:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent class MyClass \{\par
+\hspace{3ex}     public:\par
+\hspace{6ex}         ...\par
+\hspace{6ex}        int getNumEntries() const \{ return num\_entries\_; \}\par
+\hspace{5ex}   void setNumEntries(int num\_entries) \{ num\_entries\_ = num\_entries; \}\\
+\indent \par
+\hspace{3ex}     private:\par
+\hspace{6ex}         int m\_iNumEentries;\\
+\indent \};
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 其它非常短小的内联函数名也可以用小写字母, 例如. 如果你在循环中调用这样的函数甚至都不用缓存其返回值, 小写命名就可以接受.
+
+\subsection{名字空间命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+名字空间用小写字母命名, 并基于项目名称和目录结构: google\_awesome\_project.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+关于名字空间的讨论和如何命名, 参考 \emph{名字空间} 一节.
+
+\subsection{枚举命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+枚举的命名以下划线连接的小写单词组合: num\_name.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+单独的枚举值采用以下划线连接的小写单词组合. 枚举名 UrlTableErrors (以及 AlternateUrlTableErrors) 是类型, 所以要用大小写混合的方式.\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent enum UrlTableErrors \{\par
+\hspace{3ex}     error\_ok = 0,\par
+\hspace{3ex}     error\_out\_of\_memory,\par
+\hspace{3ex}     error\_malformed\_input,\\
+\indent \};
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 由于枚举值和宏之间的命名冲突, 直接导致了很多问题. 由此, 这里的枚举命名
+与宏命名和变量都不相同，避免了这个问题.\\
+
+\subsection{宏命名}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+你并不打算 \emph{使用宏}, 对吧? 如果你一定要用, 像这样命名: MY\_MACRO\_THAT\_SCARES\_SMALL\_CHILDREN.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+参考 预处理宏 $<$preprocessor-macros$>$; 通常 不应该 使用宏. 如果不得不用, 其命名像枚举命名一样全部大写, 使用下划线:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent \#define ROUND(x) ...\\
+\indent \#define PI\_ROUNDED 3.0
+\end{minipage}
+}
+
+\subsection{命名规则的特例}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+如果你命名的实体与已有 C/C++ 实体相似, 可参考现有命名策略.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+bigopen():\\
+\indent 函数名, 参照 open() 的形式\\
+uint:\\
+\indent typedef\\
+bigpos:\\
+\indent struct 或 class, 参照 pos 的形式\\
+sparse\_hash\_map:\\
+\indent STL 相似实体; 参照 STL 命名约定\\
+LONGLONG\_MAX:\\
+\indent 常量, 如同 INT\_MAX
+
+
+\newpage
+
+\section{注释}
+注释虽然写起来很痛苦, 但对保证代码可读性至关重要. 下面的规则描述了如何注释以及在哪儿注释. 当然也要记住: 注释固然很重要, 但最好的代码本身应该是自文档化. 有意义的类型名和变量名, 要远胜过要用注释解释的含糊不清的名字.
+
+
+\subsection{注释风格}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+使用//!进行简要的描述，使用///进行详细描述，使用/** */进行条目说明，使用///$<$对个别变量进行说明．注意：//！，///，///$<$ 之后必须有一个空格．
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\indent 注意：用上述一般格式的注释，doxygen会默认为下面的代码自动生成文档．如果某个地方的注释不需要文档化，则使用传统的//注释即可．\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+一行的C++注释风格：\\
+//! brief description
+\end{minipage}
+}
+\\
+\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+多行的C++注释风格：\\
+//! brief description(这会在简述里面显示)\\
+/// more details(这里是更详细的信息，在细节里面显示)
+\end{minipage}
+}
+
+\subsection{文件注释}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+在每一个文件开头加入版权公告, 然后是文件内容描述.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{法律公告和作者信息}:\\
+\indent 每个文件都应该包含以下项, 依次是:
+\begin{enumerate}
+\item[\labelitemi]
+版权声明 (比如, Copyright 2008 Google Inc.)
+\item[\labelitemi]
+许可证. 为项目选择合适的许可证版本 (比如, Apache 2.0, BSD, LGPL, GPL)
+\item[\labelitemi]
+作者: 标识文件的原始作者.
+\end{enumerate}
+\indent 如果你对原始作者的文件做了重大修改, 将你的信息添加到作者信息里. 这样当其他人对该文件有疑问时可以知道该联系谁.\\
+\textbf{文件内容}:\\
+\indent 紧接着版权许可和作者信息之后, 每个文件都要用注释描述文件内容.\\
+\indent 通常, .h 文件要对所声明的类的功能和用法作简单说明. .cpp 文件通常包含了更多的实现细节或算法技巧讨论, 如果你感觉这些实现细节或算法技巧讨论对于理解 .h 文件有帮助, 可以该注释挪到 .h, 并在 .cpp 中指出文档在 .h.\\
+\indent 不要简单的在 .h 和 .cpp 间复制注释. 这种偏离了注释的实际意义.
+
+\subsection{类注释}
+
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+每个类的定义都要附带一份注释, 描述类的功能和用法.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\fbox{
+\begin{minipage}{400pt}
+//! Iterates over the contents of a GargantuanTable.\\
+\indent ///   Sample usage:  GargantuanTable\_Iterator* iter = table-$>$NewIterator();\\
+\indent ///    for (iter-$>$Seek(``foo''); !iter-$>$done(); iter-$>$Next()) \{\par
+\indent ///    \hspace{3ex}  process(iter-$>$key(), iter-$>$value());\\
+\indent ///    \}\\
+\indent ///    delete iter;\\
+\indent class GargantuanTable\_Iterator \{\par
+\indent  \hspace{3ex}     ...\\
+\indent \};
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 如果你觉得已经在文件顶部详细描述了该类, 想直接简单的来上一句 ``完整描述见文件顶部'' 也不打紧, 但务必确保有这类注释.\\
+\indent 如果类有任何同步前提, 文档说明之. 如果该类的实例可被多线程访问, 要特别注意文档说明多线程环境下相关的规则和常量使用.\\
+注意：对类的简要描述需要写在类的外面（类定义的上一行）\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+//! A test class.\\
+/// A more elaborate class description.\\
+class Test\\
+\{\\
+\}
+\end{minipage}
+}
+\\
+\\
+\\
+
+\subsection{函数注释}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+函数声明处注释描述函数功能; 定义处描述函数实现。使用\textbackslash{}param对参数进行说明，使用\textbackslash{}return对返回值进行说明，用法见下面的例子。
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{函数声明}:\\
+\indent 注释位于声明之前, 对函数功能及用法进行描述. 注释使用叙述式 (``Opens the file'') 而非指令式 (``Open the file''); 注释只是为了描述函数, 而不是命令函数做什么. 通常, 注释不会描述函数如何工作. 那是函数定义部分的事情.\\
+函数声明处注释的内容:
+\begin{enumerate}
+\item
+函数的输入输出.
+\item
+对类成员函数而言: 函数调用期间对象是否需要保持引用参数, 是否会释放这些参数.
+\item
+如果函数分配了空间, 需要由调用者释放.
+\item
+参数是否可以为 NULL.
+\item
+是否存在函数使用上的性能隐患.
+\item
+如果函数是可重入的, 其同步前提是什么?
+\end{enumerate}
+举例如下:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent //! Returns an iterator for this table.  \\
+\indent /// It is the client's\\
+\indent /// responsibility to delete the iterator when it is done with it,\\
+\indent /// and it must not use the iterator once the GargantuanTable object\\
+\indent /// on which the iterator was created has been deleted.\\
+\indent ///\\
+\indent /// The iterator is initially positioned at the beginning of the table.\\
+\indent ///\\
+\indent /// This method is equivalent to:\par
+\indent ///\hspace{3ex}    Iterator* iter = table-$>$NewIterator();\par
+\indent ///\hspace{3ex}    iter-$>$Seek(``'');\par
+\indent ///\hspace{3ex}    return iter;\\
+\indent /// If you are going to immediately seek to another place in the\\
+\indent /// returned iterator, it will be faster to use NewIterator()\\
+\indent /// and avoid the extra seek.\\
+\indent Iterator* GetIterator() const;
+\end{minipage}
+}
+\\
+\fbox{
+\begin{minipage}{400pt}
+//! This is a test function!(Brief description)\\
+/**\par
+\hspace{3ex}	\textbackslash{}param a An interger argument.\par
+\hspace{3ex}	\textbackslash{}param s Ａ constant character
+pointer.(参数的具体介绍)\par
+\hspace{3ex}	\textbackslash{}return The test results.\par
+\hspace{3ex}	\textbackslash{}sa testMeToo()   (链接到另一个函数，see also的缩写)\par
+*/\\
+int testMe(int a, const char *s);
+\end{minipage}
+}
+\\
+\\
+\indent 但也要避免罗罗嗦嗦, 或做些显而易见的说明. 下面的注释就没有必要加上``returns false otherwise'', 因为已经暗含其中了:
+\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent //! Returns true if the table cannot hold any more entries.\\
+\indent bool IsTableFull();
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 注释构造/析构函数时, 切记读代码的人知道构造/析构函数是干啥的, 所以 ``destroys this object'' 这样的注释是没有意义的. 注明构造函数对参数做了什么 (例如, 是否取得指针所有权) 以及析构函数清理了什么. 如果都是些无关紧要的内容, 直接省掉注释. 析构函数前没有注释是很正常的.\\
+\\
+\textbf{函数定义}:\\
+\indent 每个函数定义时要用注释说明函数功能和实现要点. 比如说说你用的编程技巧, 实现的大致步骤, 或解释如此实现的理由, 为什么前半部分要加锁而后半部分不需要.\\
+\indent 不要 从 .h 文件或其他地方的函数声明处直接复制注释. 简要重述函数功能是可以的, 但注释重点要放在如何实现上.
+
+\subsection{变量注释}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+通常变量名本身足以很好说明变量用途. 某些情况下, 也需要额外的注释说明。在变量名后使用///$<$ 对变量进行注释说明。
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{类数据成员}:\\
+\indent 每个类数据成员 (也叫实例变量或成员变量) 都应该用注释说明用途. 如果变量可以接受 NULL 或 -1 等警戒值, 须加以说明.
+\\
+\\
+\\
+\\
+\textbf{全局变量}:\\
+\indent 和数据成员一样, 所有全局变量也要注释说明含义及用途. 比如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent const int gc\_iNumTestCases = 6; ///$<$ The total number of tests cases that we run through in this regression test.
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 注意：///$<$这种写法只能用来给成员变量，不能用来给结构体，类，联合，名字空间等注释.
+如下面的例子：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+//! A test class \\
+class Test\\
+\{ \par
+\hspace{2ex}  public:\par
+\hspace{3ex}    //! An enum type.\par
+\hspace{4ex}    /// The documentation block cannot be put after the enum!\par
+\hspace{3ex}    enum EnumType  \par
+\hspace{3ex}    \{  \par
+\hspace{6ex}      int e\_val1,     ///$<$ enum value 1 \par
+\hspace{6ex}      int e\_val2      ///$<$ enum value 2 \par
+\hspace{3ex}    \};\par
+\hspace{3ex}    void member();   ///$<$ a member function.\par
+\par
+\hspace{2ex}  protected:\par
+\hspace{3ex}    int m\_iValue;       ///$<$ an integer value\par
+\};
+\end{minipage}
+}
+\\
+\\
+\\
+
+\subsection{实现注释}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+对于代码中巧妙的, 晦涩的, 有趣的, 重要的地方加以注释.
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+\textbf{代码前注释}:\\
+\indent 巧妙或复杂的代码段前要加注释. 比如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// Divide result by two, taking into account that x\\
+\indent /// contains the carry from the add.\\
+\indent for (int i = 0; i $<$ result-$>$size(); i++) \{\par
+\hspace{3ex}     x = (x $<$$<$ 8) + (*result)[i];\par
+\hspace{3ex}     (*result)[i] = x $>$$>$ 1;\par
+\hspace{3ex}     x \&= 1;\\
+\}\\
+\end{minipage}
+}
+\\
+\textbf{行注释}:\\
+\indent 比较隐晦的地方要在行尾加入注释. 在行尾空两格进行注释. 比如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// If we have enough memory, mmap the data portion too.\\
+\indent mmap\_budget = max$<$int64$>$(0, mmap\_budget - index\_-$>$length());\\
+\indent if (mmap\_budget $>$= data\_size\_ \&\& !MmapData(mmap\_chunk\_bytes, mlock))\par
+\hspace{3ex}     return; \qquad /// Error already logged.\\
+\end{minipage}
+}
+\\
+\indent 注意, 这里用了两段注释分别描述这段代码的作用, 和提示函数返回时错误已经被记入日志.\\
+如果你需要连续进行多行注释, 可以使之对齐获得更好的可读性:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent doSomething();        \hspace{17ex}          /// Comment here so the comments line up.\\
+\indent doSomethingElseThatIsLonger();  /// Comment here so there are two spaces \par
+\hspace{32ex}                             ///                   between\par
+\hspace{32ex}                                 /// the code and the comment.\\
+\indent \{ /// One space before comment when opening a new scope is allowed,\par
+\hspace{2ex}   /// thus the comment lines up with the following comments and code.\par
+\hspace{2ex}   doSomethingElse();  /// Two spaces before line comments normally.\\
+\indent \}\\
+\end{minipage}
+}
+\\
+\indent NULL, true/false, 1, 2, 3...:\\
+\indent 向函数传入 NULL, 布尔值或整数时, 要注释说明含义, 或使用常量让代码望文知意. 例如, 对比:
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning\\
+\midrule
+\fbox{
+\begin{minipage}{390pt}
+bool success = calculateSomething(interesting\_value,\par
+\hspace{16ex} 10,\par
+\hspace{16ex}  false,\par
+\hspace{16ex}  NULL);  /// What are these arguments??\\
+\end{minipage}
+}
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\\
+\\
+和:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent bool success = calculateSomething(interesting\_value,\par
+\hspace{16ex}                                  10,     /// Default base value.\par
+\hspace{16ex}                                  false,  /// Not the first time we're calling this.\par
+\hspace{16ex}                                  NULL);  /// No callback.\\
+\end{minipage}
+}
+\\
+或使用常量或描述性变量:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent const int cDefaultBaseValue = 10;\\
+\indent const bool cFirstTimeCalling = false;\\
+\indent Callback *null\_callback = NULL;\\
+\indent bool success = calculateSomething(interesting\_value,\par
+\hspace{20ex}                                   cDefaultBaseValue,\par
+\hspace{20ex}                                   cFirstTimeCalling,\par
+\hspace{20ex}                                   null\_callback);\\
+\end{minipage}
+}
+\\
+\textbf{不允许}:\\
+\indent 注意 永远不要 用自然语言翻译代码作为注释. 要假设读代码的人 C++ 水平比你高, 即便他/她可能不知道你的用意:
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+/// 现在, 检查 b 数组并确保 i 是否存在,\\
+/// 下一个元素是 i+1.\\
+...        /// 天哪. 令人崩溃的注释.\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{标点，拼写和语法}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+注意标点, 拼写和语法; 写的好的注释比差的要易读的多.\\
+\bottomrule
+\end{tabular}
+\end{table}
+注释的通常写法是包含正确大小写和结尾句号的完整语句. 短一点的注释 (如代码行尾注释) 可以随意点, 依然要注意风格的一致性. 完整的语句可读性更好, 也可以说明该注释是完整的, 而不是一些不成熟的想法.\\
+虽然被别人指出该用分号时却用了逗号多少有些尴尬, 但清晰易读的代码还是很重要的. 正确的标点, 拼写和语法对此会有所帮助.
+\\
+\\
+\subsection{TODO注释}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+对那些临时的, 短期的解决方案, 或已经够好但仍不完美的代码使用 TODO 注释.\\
+\bottomrule
+\end{tabular}
+\end{table}
+TODO 注释要使用全大写的字符串 TODO, 在随后的圆括号里写上你的大名, 邮件地址, 或其它身份标识. 冒号是可选的. 主要目的是让添加注释的人 (也是可以请求提供更多细节的人) 可根据规范的 TODO 格式进行查找. 添加 TODO 注释并不意味着你要自己来修正.\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// TODO(kl@gmail.com): Use a ``*'' here for concatenation operator.\\
+\indent /// TODO(Zeke) change this to use relations.\\
+\end{minipage}
+}
+\\
+\indent 如果加 TODO 是为了在 ``将来某一天做某事'', 可以附上一个非常明确的时间 ''Fix by November 2005''), 或者一个明确的事项 (``Remove this code when all clients can handle XML responses.'').
+\\
+\subsection{在其他位置的文档}
+为了在函数体和一般的C风格的注视块之外用doxygen自动生成注释，我们需要在文档块添加
+结构化命令，这可能会导致注释信息的重复.\\
+结构化命令以一个\textbackslash 或者 @ 开头.常用的结构化命令如下：
+\begin{enumerate}
+\item[\labelitemi]\textbackslash class to document a class
+\item[\labelitemi]\textbackslash struct to document a C-struct.
+\item[\labelitemi]\textbackslash union to document a union.
+\item[\labelitemi]\textbackslash enum to document an enumeration type.
+\item[\labelitemi]\textbackslash fn to document a function.
+\item[\labelitemi]\textbackslash var to document a variable or typedef or enum value.
+\item[\labelitemi]\textbackslash def to document a \#define.
+\item[\labelitemi]\textbackslash typedef to document a type definition.
+\item[\labelitemi]\textbackslash file to document a file.
+\item[\labelitemi]\textbackslash namespace to document a namespace.
+\item[\labelitemi]\textbackslash package to document a Java package.
+\item[\labelitemi]\textbackslash interface to document an IDL interface.
+\end{enumerate}
+\fbox{
+\begin{minipage}{400pt}
+示例：\\
+	/** 	\textbackslash file filename\par
+\hspace{10ex}		\textbackslash brief file document\par
+\hspace{10ex}		details\\
+	*/
+\end{minipage}
+}
+\\
+\\
+\subsection{笔记}
+\begin{enumerate}
+    \item 关于注释风格，很多 C++ 的 coders 更喜欢行注释, C coders 或许对块注释依然情有独钟, 或者在文件头大段大段的注释时使用块注释;
+
+    \item 文件注释可以炫耀你的成就, 也是为了捅了篓子别人可以找你;
+
+    \item 注释要言简意赅, 不要拖沓冗余, 复杂的东西简单化和简单的东西复杂化都是要被鄙视的;
+
+    \item 对于 Chinese coders 来说, 用英文注释还是用中文注释, it is a problem, 但不管怎样, 注释是为了让别人看懂, 难道是为了炫耀编程语言之外的你的母语或外语水平吗；
+    \item 注释不要太乱, 适当的缩进才会让人乐意看. 但也没有必要规定注释从第几列开始 (我自己写代码的时候总喜欢这样), UNIX/LINUX 下还可以约定是使用 tab 还是 space, 个人倾向于 space;
+
+    \item TODO 很不错, 有时候, 注释确实是为了标记一些未完成的或完成的不尽如人意的地方, 这样一搜索, 就知道还有哪些活要干, 日志都省了.
+
+\end{enumerate}
+\newpage
+
+\section{格式}
+代码风格和格式确实比较随意, 但一个项目中所有人遵循同一风格是非常容易的. 个体未必同意下述每一处格式规则, 但整个项目服从统一的编程风格是很重要的, 只有这样才能让所有人能很轻松的阅读和理解代码.
+
+\subsection{行长度}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+每一行代码字符数不超过 80.\\
+\bottomrule
+\end{tabular}
+\end{table}
+我们也认识到这条规则是有争议的, 但很多已有代码都已经遵照这一规则, 我们感觉一致性更重要.\\
+\textbf{优点}:\\
+\indent 提倡该原则的人主张强迫他们调整编辑器窗口大小很野蛮. 很多人同时并排开几个代码窗口, 根本没有多余空间拉伸窗口. 大家都把窗口最大尺寸加以限定, 并且 80 列宽是传统标准. 为什么要改变呢?\\
+\\
+\textbf{缺点}:\\
+\indent 反对该原则的人则认为更宽的代码行更易阅读. 80 列的限制是上个世纪 60 年代的大型机的古板缺陷; 现代设备具有更宽的显示屏, 很轻松的可以显示更多代码.\\
+\\
+\textbf{结论}:\\
+\indent 80 个字符是最大值.\\
+\indent 特例:
+\begin{enumerate}
+\item
+如果一行注释包含了超过 80 字符的命令或 URL, 出于复制粘贴的方便允许该行超过 80 字符.
+\item
+包含长路径的 \#include 语句可以超出80列. 但应该尽量避免.
+\item
+\emph{头文件保护} 可以无视该原则.
+\end{enumerate}
+
+\subsection{非ASCII字符}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+尽量不使用非 ASCII 字符, 使用时必须使用 UTF-8 编码.\\
+\bottomrule
+\end{tabular}
+\end{table}
+即使是英文, 也不应将用户界面的文本硬编码到源代码中, 因此非 ASCII 字符要少用. 特殊情况下可以适当包含此类字符. 如, 代码分析外部数据文件时, 可以适当硬编码数据文件中作为分隔符的非 ASCII 字符串; 更常见的是 (不需要本地化的) 单元测试代码可能包含非 ASCII 字符串. 此类情况下, 应使用 UTF-8 编码, 因为很多工具都可以理解和处理 UTF-8 编码. 十六进制编码也可以, 能增强可读性的情况下尤其鼓励 —— 比如 ``\textbackslash xEF \textbackslash xBB \textbackslash xBF'' 在 Unicode 中是 零宽度 无间断 的间隔符号, 如果不用十六进制直接放在 UTF-8 格式的源文件中, 是看不到的. (``\textbackslash xEF\textbackslash xBB\textbackslash xBF'' 通常用作 UTF-8 with BOM 编码标记)\\
+\subsection{空格还是制表位}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+只使用空格, 每次缩进 2 个空格.\\
+\bottomrule
+\end{tabular}
+\end{table}
+我们使用空格缩进. 不要在代码中使用制符表. 你应该设置编辑器将制符表转为空格.
+
+\subsection{函数声明与定义}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+返回类型和函数名在同一行, 参数也尽量放在同一行.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+函数看上去像这样:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent ReturnType ClassName::functionName(Type par\_name1, Type par\_name2) \{\par
+\hspace{3ex}     doSomething();\par
+\hspace{3ex}     ...\\
+\indent \}\\
+\end{minipage}
+}
+\\
+如果同一行文本太多, 放不下所有参数:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent ReturnType ClassName::reallyLongFunctionName(Type par\_name1,\par
+\hspace{16ex}                                              Type par\_name2,\par
+\hspace{16ex}                                              Type par\_name3) \{\par
+\hspace{3ex}     doSomething();\par
+\hspace{3ex}     ...\\
+\indent \}
+\end{minipage}
+}
+\\
+甚至连第一个参数都放不下:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent ReturnType LongClassName::reallyReallyReallyLongFunctionName(\par
+\hspace{16ex}         Type par\_name1,  /// 4 space indent\par
+\hspace{16ex}         Type par\_name2,\par
+\hspace{16ex}         Type par\_name3) \{\par
+\hspace{3ex}     doSomething();  /// 2 space indent\par
+\hspace{3ex}     ...\\
+\indent \}\\
+\end{minipage}
+}
+\\
+注意以下几点:
+\begin{enumerate}
+\item
+返回值总是和函数名在同一行;
+\item
+左圆括号总是和函数名在同一行;
+\item
+函数名和左圆括号间没有空格;
+\item
+圆括号与参数间没有空格;
+\item
+左大括号总在最后一个参数同一行的末尾处;
+\item
+右大括号总是单独位于函数最后一行;
+\item
+右圆括号和左大括号间总是有一个空格;
+\item
+函数声明和实现处的所有形参名称必须保持一致;
+\item
+所有形参应尽可能对齐;
+\item
+缺省缩进为 2 个空格;
+\item
+换行后的参数保持 4 个空格的缩进;
+\end{enumerate}
+\noindent
+如果函数声明成 const, 关键字 const 应与最后一个参数位于同一行:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent //! Everything in this function signature fits on a single line\\
+\indent ReturnType functionName(Type par) const \{\par
+\hspace{3ex}   ...\\
+\indent \}\\
+\indent \\
+\indent //! This function signature requires multiple lines, but\\
+\indent /// the const keyword is on the line with the last parameter.\\
+\indent ReturnType reallyLongFunctionName(Type par1,\par
+\hspace{16ex}                                   Type par2) const \{\par
+\hspace{3ex}   ...\\
+\indent \}\\
+\end{minipage}
+}
+\\
+如果有些参数没有用到, 在函数定义处将参数名注释起来:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent //! Always have named parameters in interfaces.\\
+\indent class Shape \{\\
+\indent  public:\par
+\hspace{3ex}   virtual void rotate(double radians) = 0;\\
+\indent \}\\
+\indent \\
+\indent //! Always have named parameters in the declaration.\\
+\indent class Circle : public Shape \{\\
+\indent  public:\par
+\hspace{3ex}   virtual void rotate(double radians);\\
+\indent \}\\
+\indent \\
+\indent //! Comment out unused named parameters in definitions.\\
+\indent void Circle::rotate(double /*radians*/) \{\}
+\end{minipage}
+}
+\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning\\
+\midrule
+\fbox{
+\begin{minipage}{400pt}
+//! Bad - if someone wants to implement later, it's not clear what the\\
+/// variable means.\\
+void Circle::rotate(double) \{\}
+\end{minipage}
+}\\
+\bottomrule
+\end{tabular}
+\end{table}
+\\
+\\
+\subsection{函数调用}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+尽量放在同一行, 否则, 将实参封装在圆括号中.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+函数调用遵循如下形式:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent bool retval = doSomething(argument1, argument2, argument3);\\
+\end{minipage}
+}
+\\
+\indent 如果同一行放不下, 可断为多行, 后面每一行都和第一个实参对齐, 左圆括号后和右圆括号前不要留空格:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent bool retval = doSomething(averyveryveryverylongargument1,\par
+\hspace{27ex}                           argument2, argument3);\\
+\end{minipage}
+}
+\\
+\indent 如果函数参数很多, 出于可读性的考虑可以在每行只放一个参数:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent bool retval = doSomething(argument1,\par
+\hspace{27ex}                           argument2,\par
+\hspace{27ex}                           argument3,\par
+\hspace{27ex}                           argument4);\\
+\end{minipage}
+}
+\\
+\indent 如果函数名非常长, 以至于超过 行最大长度, 可以将所有参数独立成行:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent if (...) \{\par
+\hspace{3ex}   ...\par
+\hspace{3ex}   ...\par
+\hspace{3ex}   if (...) \{\par
+\hspace{6ex}     doSomethingThatRequiresALongFunctionName(\par
+\hspace{9ex}         very\_long\_argument1,  /// 4 space indent\par
+\hspace{9ex}         argument2,\par
+\hspace{9ex}         argument3,\par
+\hspace{9ex}         argument4);\\
+\indent   \}
+\end{minipage}
+}
+
+
+\subsection{条件语句}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+倾向于不在圆括号内使用空格. 关键字 else 另起一行.\\
+\bottomrule
+\end{tabular}
+\end{table}
+对基本条件语句有两种可以接受的格式. 一种在圆括号和条件之间有空格, 另一种没有.\\
+\indent 最常见的是没有空格的格式. 哪种都可以, 但 保持一致性. 如果你是在修改一个文件, 参考当前已有格式. 如果是写新的代码, 参考目录下或项目中其它文件. 还在徘徊的话, 就不要加空格了.\\
+\fbox{
+\begin{minipage}{400pt}
+\indent if (condition) \{  /// no spaces inside parentheses\par
+\hspace{3ex}   ...  /// 2 space indent.\\
+\indent \} else \{  /// The else goes on the same line as the closing brace.\par
+\hspace{3ex}   ...\\
+\indent \}\\
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 如果你更喜欢在圆括号内部加空格:\\
+\fbox{
+\begin{minipage}{400pt}
+\indent if ( condition ) \{  /// spaces inside parentheses - rare\par
+\hspace{3ex}   ...  /// 2 space indent.\\
+\indent \} else \{  /// The else goes on the same line as the closing brace.\par
+\hspace{3ex}   ...\\
+\indent \}\\
+\end{minipage}
+}
+\\
+\\
+\\
+\indent 注意所有情况下 if 和左圆括号间都有个空格. 右圆括号和左大括号之间也要有个空格:\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+\fbox{
+\begin{minipage}{390pt}
+if(condition)     /// Bad - space missing after IF.\\
+if (condition)\{   /// Bad - space missing before \{.\\
+if(condition)\{    /// Doubly bad.\\
+\end{minipage}
+}
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent if (condition) \{ /// Good - proper space after IF and before \{.\\
+\end{minipage}
+}
+\indent
+\\
+\indent 如果能增强可读性, 简短的条件语句允许写在同一行. 只有当语句简单并且没有使用 else 子句时使用:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+if (x == kFoo) return new Foo();\\
+if (x == kBar) return new Bar();
+\end{minipage}
+}
+\\
+\indent 如果语句有 else 分支则不允许:\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+\fbox{
+\begin{minipage}{390pt}
+/// Not allowed - IF statement on one line when there is an ELSE clause\\
+if (x) doThis();\\
+else doThat();\\
+\end{minipage}
+}
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+通常, 单行语句不需要使用大括号, 如果你喜欢用也没问题; 复杂的条件或循环语句用大括号可读性会更好. 也有一些项目要求 if 必须总是使用大括号:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+if (condition)  \par
+\hspace{3ex}  doSomething();  /// 2 space indent.\\
+\\
+if (condition) \{   \par
+\hspace{3ex}  doSomething();  /// 2 space indent.\\
+\}
+\end{minipage}
+}
+\\
+\indent 但如果语句中某个 if-else 分支使用了大括号的话, 其它分支也必须使用:
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+\fbox{
+\begin{minipage}{400pt}
+/// Not allowed - curly on IF but not ELSE\\
+if (condition) \{\par
+\hspace{3ex}    foo;\\
+\} else\par
+\hspace{3ex}    bar;\\
+\\
+/// Not allowed - curly on ELSE but not IF\\
+if (condition)\par
+\hspace{3ex}    foo;\\
+else \{\par
+\hspace{3ex}    bar;\\
+\}\\
+\end{minipage}
+}\\
+\bottomrule
+\end{tabular}
+\end{table}
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// Curly braces around both IF and ELSE required because\\
+\indent /// one of the clauses used braces.\\
+\indent if (condition) \{\par
+\hspace{3ex}   foo;\\
+\indent \} else \{\par
+\hspace{3ex}   bar;\\
+\indent \}
+\end{minipage}
+}
+
+\subsection{循环和开关选择语句}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+switch 语句可以使用大括号分段. 空循环体应使用 \{\} 或 continue.\\
+\bottomrule
+\end{tabular}
+\end{table}
+switch 语句中的 case 块可以使用大括号也可以不用, 取决于你的个人喜好. 如果用的话, 要按照下文所述的方法.\\
+
+如果有不满足 case 条件的枚举值, switch 应该总是包含一个 default 匹配 (如果有输入值没有 case 去处理, 编译器将报警). 如果 default 应该永远执行不到, 简单的加条 assert:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent switch (var) \{\par
+\hspace{3ex}   case 0: \{  /// 2 space indent\par
+\hspace{6ex}     ...      /// 4 space indent\par
+\hspace{6ex}     break;\par
+\hspace{3ex}   \}\par
+\hspace{3ex}   case 1: \{\par
+\hspace{6ex}     ...\par
+\hspace{6ex}     break;\par
+\hspace{3ex}   \}\par
+\hspace{3ex}   default: \{\par
+\hspace{6ex}     assert(false);\par
+\hspace{3ex}   \}\\
+\indent \}
+\end{minipage}
+}
+\\
+\indent 空循环体应使用 \{\} 或 continue, 而不是一个简单的分号.\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent while (condition) \{\par
+\hspace{3ex}   /// Repeat test until it returns false.\\
+\indent \}\\
+\indent for (int i = 0; i $<$ kSomeNumber; ++i) \{\}  /// Good - empty body.\\
+\indent while (condition) continue;  /// Good - continue indicates no logic.\\
+\end{minipage}
+}
+\indent \\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+\fbox{
+\begin{minipage}{400pt}
+while (condition);  /// Bad - looks like part of do/while loop.
+\end{minipage}
+}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{指针和引用表达式}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+句点或箭头前后不要有空格. 指针/地址操作符 (*, \&) 之后不能有空格.\\
+\bottomrule
+\end{tabular}
+\end{table}
+下面是指针和引用表达式的正确使用范例:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent x = *p;\\
+\indent p = \&x;\\
+\indent x = r.y;\\
+\indent x = r-$>$y;\\
+\end{minipage}
+}
+\\
+注意:
+\begin{enumerate}
+\item
+在访问成员时, 句点或箭头前后没有空格.
+\item
+指针操作符 * 或 \& 后没有空格.
+\end{enumerate}
+在声明指针变量或参数时, 星号与类型或变量名紧挨都可以:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// These are fine, space preceding.\\
+\indent char *c;\\
+\indent const string \&str;\\
+\indent \\
+\indent /// These are fine, space following.\\
+\indent char* c;    //$<$ but remember to do ``char* c, *d, *e, ...;''!\\
+\indent const string\& str;\\
+\end{minipage}
+}
+\\
+\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+char * c;  //$<$ Bad - spaces on both sides of *\\
+const string \& str;  //$<$ Bad - spaces on both sides of \&\\
+\bottomrule
+\end{tabular}
+\end{table}
+\\
+\indent 在单个文件内要保持风格一致, 所以, 如果是修改现有文件, 要遵照该文件的风格.
+\\
+
+\subsection{布尔表达式}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+如果一个布尔表达式超过 \emph{标准行宽}, 断行方式要统一一下.\\
+\bottomrule
+\end{tabular}
+\end{table}
+下例中, 逻辑与 (\&\&) 操作符总位于行尾:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent if (this\_one\_thing $>$ this\_other\_thing \&\&\par
+\hspace{3ex}     a\_third\_thing == a\_fourth\_thing \&\&\par
+\hspace{3ex}     yet\_another \& last\_one) \{\par
+\hspace{3ex}   ...\\
+\indent \}\\
+\end{minipage}
+}
+\\
+\indent 注意, 上例的逻辑与 (\&\&) 操作符均位于行尾. 可以考虑额外插入圆括号, 合理使用的话对增强可读性是很有帮助的.
+
+\subsection{函数返回值}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+return 表达式中不要用圆括号包围.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+函数返回时不要使用圆括号:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+return x;  /// not return(x);
+\end{minipage}
+}
+\\
+\\
+\\
+\\
+\\
+\subsection{变量及数组初始化}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+用 = 或 () 均可.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+在二者中做出选择; 下面的方式都是正确的:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent int x = 3;\\
+\indent int x(3);\\
+\indent string name(``Some Name'');\\
+\indent string name = ``Some Name'';\\
+\end{minipage}
+}
+\subsection{预处理指令}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+预处理指令不要缩进, 从行首开始.\\
+\bottomrule
+\end{tabular}
+\end{table}
+即使预处理指令位于缩进代码块中, 指令也应从行首开始.\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+/// Good - directives at beginning of line\par
+\hspace{3ex}   if (lopsided\_score) \{\\
+\indent \#if DISASTER\_PENDING      /// Correct -- Starts at beginning of line\par
+\hspace{6ex}     dropEverything();\\
+\indent \#endif\par
+\hspace{6ex}     backToNormal();\\
+\indent   \}\\
+\end{minipage}
+}
+\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+\fbox{
+\begin{minipage}{400pt}
+/// Bad - indented directives\par
+\hspace{3ex}  if (lopsided\_score) \{\par
+\hspace{6ex}    \#if DISASTER\_PENDING  /// Wrong!  The ``\#if'' should be at beginning of\par
+\hspace{34ex} /// line\par
+\hspace{6ex}    dropEverything();\par
+\hspace{6ex}    \#endif                /// Wrong!  Do not indent ``\#endif''\par
+\hspace{6ex}    backToNormal();\\
+  \}\\
+\end{minipage}
+}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{类格式}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+访问控制块的声明依次序是 public:, protected:, private:, 每次缩进 1 个空格.\\
+\bottomrule
+\end{tabular}
+\end{table}
+类声明 (对类注释不了解的话, 参考 \emph{类注释}) 的基本格式如下:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent class MyClass : public OtherClass \{\par
+\hspace{3ex}   DISALLOW\_COPY\_AND\_ASSIGN(MyClass);\par
+\hspace{2ex}  public:      //Note the 1 space indent.\par
+\hspace{3ex}   MyClass();  //Regular 2 space indent.\par
+\hspace{3ex}   explicit MyClass(int var);\par
+\hspace{3ex}   ~MyClass() \{\}\par
+ \par
+\hspace{3ex}   void someFunction();\par
+\hspace{3ex}   void someFunctionThatDoesNothing() \{\par
+\hspace{3ex}   \}\\
+\par
+\hspace{3ex}   void setSomeVar(int iVar) \{ m\_iSomeVar = iVar; \}\par
+\hspace{3ex}   int getSomeVar() const \{ return m\_iSomeVar; \}\\
+\indent \par
+\hspace{2ex}  private:\par
+\hspace{3ex}   bool someInternalFunction();\\
+\indent \par
+\hspace{3ex}   int m\_iSomeVar;\par
+\hspace{3ex}   int m\_iSomeOtherVar;\\
+
+\indent \};
+\end{minipage}
+}
+\\
+注意事项:
+\begin{enumerate}
+\item
+所有基类名应在 80 列限制下尽量与子类名放在同一行.
+\item
+关键词 public:, protected:, private: 要缩进 1 个空格.
+\item
+除第一个关键词 (一般是 public) 外, 其他关键词前要空一行. 如果类比较小的话也可以不空.
+这些关键词后不要保留空行.
+\item
+public 放在最前面, 然后是 protected, 最后是 private.
+\item
+关于声明顺序的规则请参考 \emph{声明顺序} 一节.
+\end{enumerate}
+
+\subsection{初始化列表}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+构造函数初始化列表放在同一行或按四格缩进并排几行.\\
+\bottomrule
+\end{tabular}
+\end{table}
+下面两种初始化列表方式都可以接受:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent /// When it all fits on one line:\\
+\indent MyClass::MyClass(int var) : some\_var\_(var), some\_other\_var\_(var + 1) \{\}
+\end{minipage}
+}
+\\
+或\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent //! When it requires multiple lines, indent 4 spaces, putting the colon on\\
+\indent /// the first initializer line:\\
+\indent MyClass::MyClass(int var)\par
+\hspace{6ex}     : some\_var\_(var),             /// 4 space indent\par
+\hspace{6ex}       some\_other\_var\_(var + 1) \{  /// lined up\par
+\hspace{3ex}   ...\par
+\hspace{3ex}   doSomething();\par
+\hspace{3ex}   ...\\
+\indent \}\\
+\end{minipage}
+}
+
+\subsection{名字空间格式化}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+名字空间内容不缩进.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+名字空间 不要增加额外的缩进层次, 例如:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent namespace \{\\
+\indent \\
+\indent void foo() \{  /// Correct.  No extra indentation within namespace.\par
+\hspace{3ex}   ...\\
+\indent \}\\
+\indent \}  /// namespace\\
+\end{minipage}
+}
+\\
+不要缩进名字空间:\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+\fbox{
+\begin{minipage}{400pt}
+namespace \{\\
+\par
+\hspace{3ex}  /// Wrong.  Indented when it should not be.\par
+\hspace{3ex}  void foo() \{\par
+\hspace{6ex}    ...\\
+\hspace{3ex}  \}\\
+\\
+\}  /// namespace\\
+\end{minipage}
+}\\
+\bottomrule
+\end{tabular}
+\end{table}
+\subsection{水平留白}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+水平留白的使用因地制宜. 永远不要在行尾添加没意义的留白.\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+常规:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent void f(bool b) \{  /// Open braces should always have a space before them.\par
+\hspace{3ex}   ...\\
+\indent int i = 0;  /// Semicolons usually have no space before them.\\
+\indent int x[] = \{ 0 \};  /// Spaces inside braces for array initialization are\\
+\indent int x[] = \{0\};    /// optional.  If you use them, put them on both sides!\\
+\indent /// Spaces around the colon in inheritance and initializer lists.\\
+\indent class Foo : public Bar \{\par
+\hspace{2ex}  public:\par
+\hspace{3ex}   /// For inline function implementations, put spaces between the braces\par
+\hspace{3ex}   /// and the implementation itself.\par
+\hspace{3ex}   Foo(int b) : Bar(), baz\_(b) \{\}  /// No spaces inside empty braces.\par
+\hspace{3ex}   void Reset() \{ baz\_ = 0; \}  /// Spaces separating braces from \par
+\hspace{30ex}   ///implementation.\par
+\hspace{3ex}   ...\\
+\end{minipage}
+}
+\\
+\indent 添加冗余的留白会给其他人编辑时造成额外负担. 因此, 行尾不要留空格. 如果确定一行代码已经修改完毕, 将多余的空格去掉; 或者在专门清理空格时去掉（确信没有其他人在处理). (现在大部分代码编辑器稍加设置后, 都支持自动删除行首/行尾空格, 如果不支持, 考虑换一款编辑器或 IDE)\\
+循环和条件语句:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent if (b) \{          /// Space after the keyword in conditions and loops.\\
+\indent \} else \{          /// Spaces around else.\\
+\indent \}\\
+\indent while (test) \{\}   /// There is usually no space inside parentheses.\\
+\indent switch (i) \{\\
+\indent for (int i = 0; i $<$ 5; ++i) \{\\
+\indent switch ( i ) \{    /// Loops and conditions may have spaces inside\\
+\indent if ( test ) \{     /// parentheses, but this is rare.  Be consistent.\\
+\indent for ( int i = 0; i $<$ 5; ++i ) \{\\
+\indent for ( ; i $<$ 5 ; ++i) \{  /// For loops always have a space after the\par
+\hspace{3ex}   ...       \hspace{14ex}            /// semicolon, and may have a space before the\\
+\indent               \hspace{21ex}          /// semicolon.\\
+\indent switch (i) \{\par
+\hspace{3ex}   case 1:         /// No space before colon in a switch case.\par
+\hspace{3ex}     ...\par
+\hspace{3ex}   case 2: break;  /// Use a space after a colon if there's code after it.
+\end{minipage}
+}
+\\
+操作符:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent x = 0;              /// Assignment operators always have spaces around\par
+\hspace{25ex}                     /// them.\\
+\indent x = -5;             /// No spaces separating unary operators and their\\
+\indent ++x;                /// arguments.\\
+\indent if (x \&\& !y)\par
+\hspace{3ex}   ...\\
+\indent v = w * x + y / z;  /// Binary operators usually have spaces around them,\\
+\indent v = w*x + y/z;      /// but it's okay to remove spaces around factors.\\
+\indent v = w * (x + z);    /// Parentheses should have no spaces inside them.\\
+\end{minipage}
+}
+\\
+模板和转换:\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+\indent vector$<$string$>$ x;           /// No spaces inside the angle\\
+\indent y = static\_cast$<$char*$>$(x);  /// brackets ($<$ and $>$), before\par
+\hspace{25ex}                             /// $<$, or between $>$( in a cast.\\
+\indent vector$<$char *$>$ x;           /// Spaces between type and pointer are\par
+\hspace{25ex}                          /// okay, but be consistent.\\
+\indent set$<$list$<$string$>$ $>$ x;       /// C++ requires a space in $>$ $>$.\\
+\indent set$<$ list$<$string$>$ $>$ x;      /// You may optionally make use\par
+\hspace{25ex}                           /// symmetric spacing in $<$ $<$.\\
+\end{minipage}
+}
+
+\subsection{垂直留白}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+垂直留白越少越好.\\
+\bottomrule
+\end{tabular}
+\end{table}
+这不仅仅是规则而是原则问题了: 不在万不得已, 不要使用空行. 尤其是: 两个函数定义之间的空行不要超过 2 行, 函数体首尾不要留空行, 函数体中也不要随意添加空行.\\
+基本原则是: 同一屏可以显示的代码越多, 越容易理解程序的控制流. 当然, 过于密集的代码块和过于疏松的代码块同样难看, 取决于你的判断. 但通常是垂直留白越少越好.\\
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+函数首尾不要有空行\\
+\fbox{
+\begin{minipage}{400pt}
+void Function() \{\par
+\hspace{3ex}  /// Unnecessary blank lines before and after\\
+\}\\
+\end{minipage}
+}
+\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor{red} Warning \\
+\midrule
+if-else 块之间不要有空行:\\
+\fbox{
+\begin{minipage}{400pt}
+\indent if (condition) \{\par
+\hspace{3ex}   /// Some lines of code too small to move to another function,\par
+\hspace{3ex}   /// followed by a blank line.\\
+\indent \} else \{\par
+\hspace{3ex}   /// Another block of code\\
+\indent \}\\
+\end{minipage}
+}\\
+\bottomrule
+\end{tabular}
+\end{table}
+\noindent
+
+代码块首尾空一行是可以接受的：\\
+\\
+\fbox{
+\begin{minipage}{400pt}
+while (condition) \{\par
+\hspace{3ex}  /// Unnecessary blank line after\\
+\}\\
+\\
+if (condition) \{\par
+\hspace{3ex}  /// Unnecessary blank line before\\
+\}\\
+\end{minipage}
+}\\
+
+\subsection{笔记}
+\begin{enumerate}
+    \item 对于代码格式, 因人, 系统而异各有优缺点, 但同一个项目中遵循同一标准还是有必要的;
+
+    \item 行宽原则上不超过 80 列, 把 22 寸的显示屏都占完, 怎么也说不过去;
+
+    \item 尽量不使用非 ASCII 字符, 如果使用的话, 参考 UTF-8 格式 (尤其是 UNIX/Linux 下, Windows 下可以考虑宽字符), 尽量不将字符串常量耦合到代码中, 比如独立出资源文件, 这不仅仅是风格问题了;
+
+    \item UNIX/Linux 下无条件使用空格, MSVC 的话使用 Tab 也无可厚非;
+
+    \item 除函数定义的左大括号可以置于行首外, 包括函数/类/结构体/枚举声明, 各种语句的左大括号置于行尾, 所有右大括号独立成行;
+
+    \item 预处理指令/命名空间不使用额外缩进, 类/结构体/枚举/函数/语句使用缩进;
+    \item 初始化用 = 还是 () 依个人喜好, 统一就好;
+    \item return 不要加 ();
+    \item 水平/垂直留白不要滥用, 怎么易读怎么来.
+    \item 关于 UNIX/Linux 风格为什么要把左大括号置于行尾, 我的理解是代码看上去比较简约, 想想行首除了函数体被一对大括号封在一起之外, 只有右大括号的代码看上去确实也舒服; Windows 风格将左大括号置于行首的优点是匹配情况一目了然.
+
+\end{enumerate}
+\newpage
+
+\section{规则特例}
+\subsection{现有不合规范的代码}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+对于现有不符合既定编程风格的代码可以网开一面.\\
+\bottomrule
+\end{tabular}
+\end{table}
+当你修改使用其他风格的代码时, 为了与代码原有风格保持一致可以不使用本指南约定. 如果不放心可以与代码原作者或现在的负责人员商讨, 记住, 一致性 包括原有的一致性.
+
+
+\subsection{Windows代码}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+Windows 程序员有自己的编程习惯, 主要源于 Windows 头文件和其它 Microsoft 代码. 我们希望任何人都可以顺利读懂你的代码, 所以针对所有平台的 C++ 编程只给出一个单独的指南.\\
+\bottomrule
+\end{tabular}
+\end{table}
+如果你习惯使用 Windows 编码风格, 这儿有必要重申一下某些你可能会忘记的指南:
+\begin{enumerate}
+%\item
+%不要使用匈牙利命名法 (比如把整型变量命名成 iNum). 使用 Google 命名约定, 包括对源文件使用 .cc 扩展名.
+\item
+Windows 定义了很多原生类型的同义词 (这一点, 我也很反感), 如 DWORD, HANDLE 等等. 在调用 Windows API 时这是完全可以接受甚至鼓励的. 但还是尽量使用原有的 C++ 类型, 例如, 使用 const TCHAR * 而不是 LPCTSTR.
+\item
+使用 Microsoft Visual C++ 进行编译时, 将警告级别设置为 3 或更高, 并将所有 warnings 当作 errors 处理.
+不要使用 \#pragma once; 而应该使用 Google 的头文件保护规则. 头文件保护的路径应该相对于项目根目录 (如 \#ifndef SRC\_DIR\_BAR\_H\_, 参考 \#define 保护 一节).
+\item
+除非万不得已, 不要使用任何非标准的扩展, 如 \#pragma 和 \_\_declspec. 允许使用 \_\_declspec(dllimport) 和 \_\_declspec(dllexport); 但你必须通过宏来使用, 比如 DLLIMPORT 和 DLLEXPORT, 这样其他人在分享使用这些代码时很容易就去掉这些扩展.
+\end{enumerate}
+在 Windows 上, 只有很少的一些情况下, 我们可以偶尔违反规则:
+\begin{enumerate}
+\item
+通常我们 禁止使用多重继承, 但在使用 COM 和 ATL/WTL 类时可以使用多重继承. 为了实现 COM 或 ATL/WTL 类/接口, 你可能不得不使用多重实现继承.
+\item
+虽然代码中不应该使用异常, 但是在 ATL 和部分 STL（包括 Visual C++ 的 STL) 中异常被广泛使用. 使用 ATL 时, 应定义 \_ATL\_NO\_EXCEPTIONS 以禁用异常. 你要研究一下是否能够禁用 STL 的异常, 如果无法禁用, 启用编译器异常也可以. (注意这只是为了编译 STL, 自己代码里仍然不要含异常处理.)
+\item
+通常为了利用头文件预编译, 每个源文件的开头都会包含一个名为 StdAfx.h 或 precompile.h 的文件. 为了使代码方便与其他项目共享, 避免显式包含此文件 (precompile.cpp), 使用 /FI 编译器选项以自动包含.
+\item
+资源头文件通常命名为 resource.h, 且只包含宏的, 不需要遵守本风格指南.
+\end{enumerate}
+
+\newpage
+
+\section{其他}
+\subsection{智能指针}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+如果确实需要使用智能指针的话, scoped\_ptr 完全可以胜任. 你应该只在非常特定的情况下使用 utl::shared\_ptr, 例如 STL 容器中的对象. 任何情况下都不要使用 auto\_ptr.(std::tr1::shared\_ptr不存在于目前的STL中，tr1为下一代库，为了兼容性考虑，我们禁止使用)\\
+\bottomrule
+\end{tabular}
+\end{table}
+“智能” 指针看上去是指针, 其实是附加了语义的对象. 以 scoped\_ptr 为例, scoped\_ptr 被销毁时, 它会删除所指向的对象. shared\_ptr 也是如此, 并且 shared\_ptr 实现了引用计数, 所以最后一个 shared\_ptr 对象析构时, 如果检测到引用次数为 0，就会销毁所指向的对象.\\
+一般来说，我们倾向于设计对象隶属明确的代码, 最明确的对象隶属是根本不使用指针, 直接将对象作为一个作用域或局部变量使用. 另一种极端做法是, 引用计数指针不属于任何对象. 这种方法的问题是容易导致循环引用, 或者导致某个对象无法删除的诡异状态, 而且在每一次拷贝或赋值时连原子操作都会很慢.\\
+虽然不推荐使用引用计数指针, 但有些时候它们的确是最简单有效的解决方案.最后强调一下shared\_ptr做参数传递时，尽可能使用引用.
+
+\subsection{cpplint}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+使用 cpplint.py 检查风格错误.\\
+\bottomrule
+\end{tabular}
+\end{table}
+cpplint.py 是一个用来分析源文件, 能检查出多种风格错误的工具. 它不并完美, 甚至还会漏报和误报, 但它仍然是一个非常有用的工具. 用行注释 // NOLINT 可以忽略误报.\\
+某些项目会指导你如何使用他们的项目工具运行 cpplint.py. 如果你参与的项目没有提供, 你可以单独下载 cpplint.py.
+
+\subsection{目录组织方式}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+include中为头文件， libs中为对应的实现文件.cpp，tools中为包含main的文件，projects中为工程文件，build为生成目录，test为测试目录。\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{结束语}
+\begin{table}[htbp]
+\flushleft
+\begin{tabular}{p{400pt}}
+\toprule
+\rowcolor[gray]{.8} Tip \\
+\midrule
+运用常识和判断力, 并 保持一致.\\
+\bottomrule
+\end{tabular}
+\end{table}
+编辑代码时, 花点时间看看项目中的其它代码, 并熟悉其风格. 如果其它代码中 if 语句使用空格, 那么你也要使用. 如果其中的注释用星号 (*) 围成一个盒子状, 你同样要这么做.\\
+\indent
+风格指南的重点在于提供一个通用的编程规范, 这样大家可以把精力集中在实现内容而不是表现形式上. 我们展示了全局的风格规范, 但局部风格也很重要, 如果你在一个文件中新加的代码和原有代码风格相去甚远, 这就破坏了文件本身的整体美观, 也影响阅读, 所以要尽量避免.\\
+\indent
+好了, 关于编码风格写的够多了; 代码本身才更有趣. 尽情享受吧!
+
+\end{CJK}
+\end{document} 
